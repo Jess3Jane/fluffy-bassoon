@@ -88,6 +88,7 @@ function updateHud() {
   statsEl.innerHTML = [
     row("Population", s.population),
     row("Peak", s.peak),
+    row("Species", s.species),
     row("Carnivores", s.carnivores),
     row("Food", s.food),
     row("Scent", s.scent),

@@ -197,6 +197,17 @@ export const CONFIG = {
     kinDensityNorm: 3, // hue-weighted kin count at which the emission read saturates
   },
 
+  // Speciation readout: how the live population is bucketed into "species" for
+  // the HUD/chart tally. Creatures are clustered by lineage hue (single-linkage
+  // along the colour wheel, against `scent.kinTolerance` so a clade reads as one
+  // species exactly as it reads as one kin group), and only clusters with at
+  // least `minClusterSize` members count — so a lone mutant or a dying splinter
+  // doesn't inflate the count. Purely an observation derived from existing state;
+  // it changes nothing about the simulation and adds nothing to the save.
+  speciation: {
+    minClusterSize: 3, // smallest hue cluster that counts as a distinct species
+  },
+
   // Terrain: a static, seed-generated map of tiles under the world. Most of it
   // is ordinary grassland; wrapping value-noise carves out patches of water,
   // fertile soil, and barren ground that shape where food grows (`fertility`,

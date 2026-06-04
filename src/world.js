@@ -6,7 +6,7 @@
 import { CONFIG } from "./config.js";
 import { Creature, reserveIds } from "./creature.js";
 import { SpatialGrid } from "./grid.js";
-import { GENES, hueSimilarity } from "./genome.js";
+import { GENES, hueSimilarity, countHueClusters } from "./genome.js";
 import { wrapDistSq } from "./math.js";
 import { daylight, foodGrowthFactor } from "./daycycle.js";
 import {
@@ -401,6 +401,7 @@ export class World {
     let maxGen = 0;
     let energy = 0;
     let carnivores = 0;
+    const hues = []; // lineage hues, clustered below into a species count
     for (const c of this.creatures) {
       avg.speed += c.genome.speed;
       avg.sense += c.genome.sense;
@@ -417,6 +418,7 @@ export class World {
       energy += c.energy;
       if (c.genome.diet > CONFIG.creature.carnivoreThreshold) carnivores++;
       if (c.generation > maxGen) maxGen = c.generation;
+      hues.push(c.lineageHue);
     }
     if (n > 0) {
       for (const k of Object.keys(avg)) avg[k] /= n;
@@ -438,6 +440,11 @@ export class World {
       avgEnergy: energy,
       carnivores,
       kills: this.kills,
+      species: countHueClusters(
+        hues,
+        CONFIG.scent.kinTolerance,
+        CONFIG.speciation.minClusterSize,
+      ),
       avg,
     };
   }
