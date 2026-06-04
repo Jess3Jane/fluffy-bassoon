@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fluffy Bassoon — an evolving ecosystem</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <canvas id="world"></canvas>
+
+  <div id="hud">
+    <h1>Fluffy Bassoon</h1>
+    <div id="stats"></div>
+    <div id="controls">
+      <button id="pause" type="button">Pause</button>
+      <button id="reset" type="button">Reset</button>
+      <label class="speed">
+        Speed
+        <input id="speed" type="range" min="1" max="8" step="1" value="1" />
+        <span id="speed-label">1×</span>
+      </label>
+    </div>
+    <p class="hint">Click the world to drop food. Watch evolution do the rest.</p>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

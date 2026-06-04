@@ -1,3 +1,36 @@
 # Tasks
 
-TODO: Fill in your first tasks
+A roadmap for **Fluffy Bassoon** — an evolving creature ecosystem. The goal is
+emergent complexity: simple per-creature rules that, in aggregate, produce
+population dynamics, natural selection, and surprising behaviour.
+
+## Done
+
+- [x] Project scaffold: `index.html`, `styles.css`, ES-module source layout,
+      deployable to GitHub Pages with no build step.
+- [x] Core simulation loop with fixed-timestep update and canvas rendering.
+- [x] World: toroidal 2D space holding food and creatures.
+- [x] Food: plants that spawn and regrow over time.
+- [x] Creatures: energy, position, heading, and a heritable genome.
+- [x] Sensing + behaviour: creatures steer toward food using their genome.
+- [x] Metabolism: moving and living cost energy; eating restores it.
+- [x] Reproduction with mutation; death at zero energy.
+- [x] Live stats overlay (population, food, generation, average traits).
+
+## Next up
+
+- [ ] Predator / prey dynamics: a carnivore diet trait so creatures can hunt
+      each other, creating a second trophic level.
+- [ ] Spatial partitioning (grid hashing) so neighbour queries scale to large
+      populations.
+- [ ] Lineage / species colouring driven by genome so clades are visible.
+- [ ] Charts: population and trait history over time.
+- [ ] Save / load world state to localStorage.
+- [ ] Interactive tools: click to add food, drag to spawn creatures.
+
+## Ideas / someday
+
+- Day-night cycle affecting food growth.
+- Terrain (water, fertile, barren) influencing movement and food.
+- Simple neural-net brains instead of hand-tuned genome weights.
+- Sexual reproduction with genome crossover.
