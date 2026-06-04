@@ -8,6 +8,7 @@ import { CONFIG } from "./config.js";
 import { randomGenome, mutate, genomeHue } from "./genome.js";
 import { wrapDelta } from "./math.js";
 import { weatherSenseFactor, windStrength, windDirection } from "./weather.js";
+import { SCENT } from "./scent.js";
 
 let NEXT_ID = 1;
 
@@ -154,6 +155,21 @@ export class Creature {
       this.heading += rng.normal() * wind * CONFIG.weather.windBuffet * dt;
     }
 
+    // --- Smell the air. Nearby plumes nudge the heading: a herbivore is drawn to
+    // "food here" scent and recoils from the blood-scent of a kill, while a
+    // carnivore is instead drawn toward that blood (the field owns the diet
+    // logic). Scent reads at the creature's full `sense` reach *undimmed* by rain
+    // — smell carries when sight fails — so it complements the weather-fogged eye.
+    // The nudge scales with the local scent gradient, so a strong, close trail
+    // turns a creature firmly while a faint whiff barely deflects it. ---
+    const steer = world.scent.steer(this.x, this.y, g.diet, g.sense);
+    if (steer.dx !== 0 || steer.dy !== 0) {
+      const desiredScent = Math.atan2(steer.dy, steer.dx);
+      const towardScent = wrapAngle(desiredScent - this.heading);
+      const mag = Math.hypot(steer.dx, steer.dy);
+      this.heading += towardScent * Math.min(1, mag * dt);
+    }
+
     // --- Move. Terrain underfoot scales travel: open ground is free, but water
     // bogs a creature down, so it crawls across (and burns base metabolism the
     // whole time), making water a natural barrier and refuge. ---
@@ -169,6 +185,8 @@ export class Creature {
       const eaten = world.consumeFoodNear(this.x, this.y, reach);
       if (eaten > 0) {
         this.gain(eaten * CONFIG.food.energy * (1 - g.diet));
+        // Leave a "food here" plume on the air for others to follow.
+        world.scent.emit(this.x, this.y, SCENT.FOOD, CONFIG.scent.foodStrength);
       }
     }
 
@@ -182,6 +200,9 @@ export class Creature {
         this.gain(
           g.diet * (victim.energy * c.meatEnergyEff + victim.radius * c.meatBodyEnergy),
         );
+        // A kill spills a strong "danger" plume where the prey fell — blood on
+        // the wind that sends other prey fleeing and draws other predators in.
+        world.scent.emit(victim.x, victim.y, SCENT.DANGER, CONFIG.scent.dangerStrength);
       }
     }
 

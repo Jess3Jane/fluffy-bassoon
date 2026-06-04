@@ -5,6 +5,7 @@ import { CONFIG } from "./config.js";
 import { daylight } from "./daycycle.js";
 import { weatherNoise, windStrength, windDirection } from "./weather.js";
 import { TILE } from "./terrain.js";
+import { SCENT } from "./scent.js";
 
 // Fill colours per tile kind, indexed by the TILE enum. Grass doubles as the
 // world backdrop, so only the patches that differ from it are drawn over the top.
@@ -69,6 +70,11 @@ export class Renderer {
     ctx.strokeStyle = "rgba(111, 211, 199, 0.15)";
     ctx.lineWidth = 1 / this.scale;
     ctx.strokeRect(0, 0, world.width, world.height);
+
+    // Scent plumes drift under everything else as soft coloured hazes — green
+    // for "food here", red for the "danger" of a kill — so the invisible field
+    // the wind carries becomes visible, fading with each plume's strength.
+    this.drawScent(ctx, world.scent);
 
     // Food.
     ctx.fillStyle = "#3f7d52";
@@ -162,6 +168,26 @@ export class Renderer {
     }
     ctx.stroke();
     ctx.restore();
+  }
+
+  // Paint the scent field as soft translucent blobs, one per plume, sized and
+  // faded by strength so a fresh, strong plume reads boldly and a thinning one
+  // melts away. Food scent glows green, danger scent red — the same green/red the
+  // trophic colouring uses, so "where the grazing is" and "where blood was spilt"
+  // read at a glance. Purely a view of `world.scent`; it holds no state of its own.
+  drawScent(ctx, scent) {
+    for (const p of scent.plumes) {
+      const frac = Math.min(1, p.strength / CONFIG.scent.dangerStrength);
+      const a = (0.04 + frac * 0.16).toFixed(3);
+      const r = 10 + frac * 16;
+      ctx.fillStyle =
+        p.kind === SCENT.FOOD
+          ? `rgba(96, 220, 132, ${a})`
+          : `rgba(228, 72, 96, ${a})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   drawCreature(ctx, c) {

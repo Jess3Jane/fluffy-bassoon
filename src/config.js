@@ -101,6 +101,28 @@ export const CONFIG = {
     windFoodDrift: 18, // how fast a full gale drifts loose food downwind (units/sec)
   },
 
+  // Scent / pheromone plumes: a drifting chemical field laid down by living
+  // creatures that turns the prevailing wind into an information channel. A
+  // feeding creature drops a "food here" plume; a creature killed drops a strong
+  // "danger" (blood) plume. Others smell the field within their `sense` gene's
+  // reach and are nudged toward or away by diet — herbivores chase food scent and
+  // flee blood, carnivores home in on the blood — so flocking and avoidance can
+  // emerge from the same field the wind already drifts. Plumes ride the storm
+  // wind downwind (faster than heavy food, since scent is airborne) and fade
+  // linearly until forgotten. This is real, serialized state (it depends on what
+  // creatures did, not just the clock), but emission/drift/decay draw no fresh
+  // rng, so a restored field replays bit-identically.
+  scent: {
+    maxCount: 800, // hard cap on live plumes; oldest is evicted past it
+    foodStrength: 1.2, // strength of a plume dropped on feeding
+    dangerStrength: 2.6, // strength of a plume dropped where a creature is killed
+    decayPerSecond: 0.4, // strength lost per second (a death lingers ~6s, a feed ~3s)
+    minStrength: 0.05, // a plume below this is dropped from the field
+    drift: 30, // downwind drift speed (units/sec) at a full gale — beats food's
+    foodAttract: 2.4, // how strongly food scent pulls a herbivore toward it
+    dangerResponse: 3.4, // how strongly blood scent repels prey / draws predators
+  },
+
   // Terrain: a static, seed-generated map of tiles under the world. Most of it
   // is ordinary grassland; wrapping value-noise carves out patches of water,
   // fertile soil, and barren ground that shape where food grows (`fertility`,
