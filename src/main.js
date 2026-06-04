@@ -110,6 +110,7 @@ function updateHud() {
     row("Alarm voice", s.avg.alarmVoice.toFixed(2)),
     row("Food trust", s.avg.foodTrust.toFixed(2)),
     row("Alarm trust", s.avg.alarmTrust.toFixed(2)),
+    row("Kinship", s.avg.kinship.toFixed(2)),
   ].join("");
 }
 

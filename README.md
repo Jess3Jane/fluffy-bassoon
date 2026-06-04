@@ -61,6 +61,18 @@ is free, honesty is a gamble, eavesdropping is cheap, and a deceiver that shouts
 "danger" with a deaf ear can scatter rivals off contested food. Watch the
 signalling traits in the HUD drift as selection sorts it out.
 
+Cooperation has something to select for, too, through **kin recognition**. Every
+plume now carries the lineage hue of whoever laid it, and a heritable `kinship`
+trait sets how much a creature weights the field by *who* is calling: a kin-blind
+creature answers every plume by its diet alone (the old behaviour), while a
+kin-keen one answers mostly its own relatives — those whose inherited colour sits
+close to its own — and tunes out strangers. That tilts the maths behind honest
+*food* signalling: broadcasting your larder to every passing competitor is pure
+altruism that erodes to silence, but a call that mostly draws close kin (who
+carry the same calling gene) can pay off through inclusive fitness. So the
+signalling arena becomes a tension between kin-directed honesty and
+stranger-directed deception, with `kinship` in the HUD tracking where it lands.
+
 ## Run it
 
 It's a static site with no build step. Either open `index.html` through a local
@@ -94,8 +106,9 @@ Or just use the deployed GitHub Pages site.
   the season (Summer / Autumn / Winter / Spring), weather (Drought … Storm, with
   the combined climate food percentage), the wind (Calm, or a compass bearing and
   strength once a storm raises one), the live scent-plume count, and average
-  traits — including diet and the four heritable signalling traits (food/alarm
-  voice and trust).
+  traits — including diet, the four heritable signalling traits (food/alarm
+  voice and trust), and `kinship` (how strongly the creature filters scent by
+  the caller's lineage).
 - Two **history charts** in the HUD trace the world over time: a population
   panel (total population with the carnivore sub-band) and an average-trait
   panel (diet plus speed/size normalised onto a shared 0–1 axis), so you can

@@ -15,6 +15,7 @@
 import { CONFIG } from "./config.js";
 import { SpatialGrid } from "./grid.js";
 import { wrapDelta } from "./math.js";
+import { hueSimilarity } from "./genome.js";
 
 // Plume kinds. Numeric values index nothing critical, but stay stable so saved
 // plumes deserialize to the same meaning.
@@ -33,10 +34,13 @@ export class ScentField {
   }
 
   // Lay a plume of `kind` at a point. Caps the field at `maxCount` by evicting
-  // the oldest plume, so a busy world can't grow the field without bound.
-  emit(x, y, kind, strength) {
+  // the oldest plume, so a busy world can't grow the field without bound. `hue`
+  // tags the plume with the lineage hue of whoever laid it, so smellers can tell
+  // kin's plumes from strangers'; it defaults to null (an untagged plume reads as
+  // kin to everyone, so kin-weighting degrades gracefully to the old behaviour).
+  emit(x, y, kind, strength, hue = null) {
     if (this.plumes.length >= CONFIG.scent.maxCount) this.plumes.shift();
-    this.plumes.push({ x, y, kind, strength });
+    this.plumes.push({ x, y, kind, strength, hue });
   }
 
   // (Re)build the spatial index from the current plumes. Called once per step
@@ -87,15 +91,26 @@ export class ScentField {
   // a deceiver shout "danger" without scattering itself. Trust defaults to 1 so
   // a caller that doesn't pass it (e.g. tests) gets the old full-response field.
   //
+  // On top of trust, each plume is weighted by *kinship*: how close the emitter's
+  // lineage hue is to the smeller's own, scaled by the smeller's `kinship` gene.
+  // At kinship 0 the creature is kin-blind (weight 1 — the old behaviour); as
+  // kinship rises it discounts strangers' plumes toward zero, so it answers
+  // mostly its own kin. This is what lets honest *food* signalling pay: a loud
+  // larder-call that mainly draws relatives (who share the gene) is favoured by
+  // inclusive fitness, where one that fed every passing competitor was not.
+  // `smellerHue`/`kinship` default to a kin-blind response so old callers are
+  // unchanged.
+  //
   // Each plume contributes a unit vector toward (or away from) it, scaled by a
   // linear distance falloff and its strength, so near/strong plumes dominate and
   // a plume at the edge of `radius` barely registers.
-  steer(x, y, diet, radius, foodTrust = 1, alarmTrust = 1) {
+  steer(x, y, diet, radius, foodTrust = 1, alarmTrust = 1, smellerHue = null, kinship = 0) {
     let dx = 0;
     let dy = 0;
     const r2 = radius * radius;
     const foodAttract = CONFIG.scent.foodAttract * foodTrust;
     const dangerResponse = CONFIG.scent.dangerResponse * alarmTrust;
+    const tol = CONFIG.scent.kinTolerance;
     this.grid.forEachNear(x, y, radius, (p) => {
       const ddx = wrapDelta(p.x - x, this.width);
       const ddy = wrapDelta(p.y - y, this.height);
@@ -105,12 +120,15 @@ export class ScentField {
       // Unit vector toward the plume, scaled by linear falloff × strength. (ddx/d
       // normalises; (1 − d/radius) fades it to nothing at the sensing edge.)
       const falloff = ((1 - d / radius) * p.strength) / d;
+      // Kin weight: 1 when kin-blind (kinship 0) or the emitter is a relative,
+      // sliding toward 0 for a stranger's plume as kinship rises.
+      const kin = 1 - kinship * (1 - hueSimilarity(smellerHue, p.hue, tol));
       let w;
       if (p.kind === SCENT.FOOD) {
-        w = falloff * (1 - diet) * foodAttract;
+        w = falloff * (1 - diet) * foodAttract * kin;
       } else {
         // Herbivore (diet 0) → −1 (flee); carnivore (diet 1) → +1 (investigate).
-        w = falloff * (2 * diet - 1) * dangerResponse;
+        w = falloff * (2 * diet - 1) * dangerResponse * kin;
       }
       dx += ddx * w;
       dy += ddy * w;
@@ -118,17 +136,26 @@ export class ScentField {
     return { dx, dy };
   }
 
-  // Compact, JSON-safe snapshot: one [x, y, kind, strength] tuple per plume.
+  // Compact, JSON-safe snapshot: one [x, y, kind, strength, hue] tuple per
+  // plume. The trailing `hue` is the emitter's lineage marker (or null for an
+  // untagged plume), carried so kin-weighting replays identically after a load.
   serialize() {
-    return this.plumes.map((p) => [p.x, p.y, p.kind, p.strength]);
+    return this.plumes.map((p) => [p.x, p.y, p.kind, p.strength, p.hue ?? null]);
   }
 
   // Rebuild a field from a `serialize()` snapshot. Tolerates a missing array so
   // older saves (or an empty field) load as an empty field rather than throwing.
+  // A tuple without a `hue` slot deserializes as an untagged (kin-blind) plume.
   static deserialize(data, width, height) {
     const field = new ScentField(width, height);
     if (Array.isArray(data)) {
-      field.plumes = data.map(([x, y, kind, strength]) => ({ x, y, kind, strength }));
+      field.plumes = data.map(([x, y, kind, strength, hue = null]) => ({
+        x,
+        y,
+        kind,
+        strength,
+        hue,
+      }));
     }
     return field;
   }
