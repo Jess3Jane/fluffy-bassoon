@@ -5,7 +5,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "node test/smoke.mjs && node test/history.test.mjs && node test/persistence.test.mjs && node test/tools.test.mjs && node test/daycycle.test.mjs && node test/terrain.test.mjs && node test/weather.test.mjs && node test/scent.test.mjs",
+    "test": "node test/smoke.mjs && node test/history.test.mjs && node test/persistence.test.mjs && node test/tools.test.mjs && node test/daycycle.test.mjs && node test/terrain.test.mjs && node test/weather.test.mjs && node test/scent.test.mjs && node test/signalling.test.mjs",
     "serve": "node --version >/dev/null && python3 -m http.server 8000"
   },
   "license": "MIT"

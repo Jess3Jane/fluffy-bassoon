@@ -105,6 +105,11 @@ function updateHud() {
     row("Avg size", s.avg.size.toFixed(2)),
     row("Avg wander", s.avg.wander.toFixed(2)),
     row("Avg diet", s.avg.diet.toFixed(2)),
+    divider(),
+    row("Food voice", s.avg.foodVoice.toFixed(2)),
+    row("Alarm voice", s.avg.alarmVoice.toFixed(2)),
+    row("Food trust", s.avg.foodTrust.toFixed(2)),
+    row("Alarm trust", s.avg.alarmTrust.toFixed(2)),
   ].join("");
 }
 

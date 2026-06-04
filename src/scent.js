@@ -81,15 +81,21 @@ export class ScentField {
   //     scent while a carnivore is drawn to it, so the same death-marker repels
   //     prey and summons predators, an information asymmetry on one field.
   //
+  // Each kind's pull is additionally scaled by the smeller's heritable *trust*
+  // in that channel (`foodTrust`, `alarmTrust`), so a creature can evolve to
+  // heed or ignore each plume independently of its diet — the deaf ear that lets
+  // a deceiver shout "danger" without scattering itself. Trust defaults to 1 so
+  // a caller that doesn't pass it (e.g. tests) gets the old full-response field.
+  //
   // Each plume contributes a unit vector toward (or away from) it, scaled by a
   // linear distance falloff and its strength, so near/strong plumes dominate and
   // a plume at the edge of `radius` barely registers.
-  steer(x, y, diet, radius) {
+  steer(x, y, diet, radius, foodTrust = 1, alarmTrust = 1) {
     let dx = 0;
     let dy = 0;
     const r2 = radius * radius;
-    const foodAttract = CONFIG.scent.foodAttract;
-    const dangerResponse = CONFIG.scent.dangerResponse;
+    const foodAttract = CONFIG.scent.foodAttract * foodTrust;
+    const dangerResponse = CONFIG.scent.dangerResponse * alarmTrust;
     this.grid.forEachNear(x, y, radius, (p) => {
       const ddx = wrapDelta(p.x - x, this.width);
       const ddy = wrapDelta(p.y - y, this.height);

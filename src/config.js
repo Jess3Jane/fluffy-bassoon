@@ -121,6 +121,18 @@ export const CONFIG = {
     drift: 30, // downwind drift speed (units/sec) at a full gale — beats food's
     foodAttract: 2.4, // how strongly food scent pulls a herbivore toward it
     dangerResponse: 3.4, // how strongly blood scent repels prey / draws predators
+
+    // Heritable signalling. A creature's `foodVoice`/`alarmVoice` genes scale how
+    // loudly it emits each plume, and each emission spends `emitCost` energy per
+    // unit of strength laid — so a chatterbox pays for its noise, and silence is
+    // a viable (free) strategy. A real kill's blood plume is involuntary and
+    // stays at `dangerStrength`; an *alarm* cry is a voluntary danger plume a
+    // creature can choose to lay (up to `alarmRate` times/sec at full voice) at
+    // `alarmStrength` — indistinguishable on the air from real blood, which is
+    // exactly what makes a deceptive "danger" call able to scatter rivals.
+    emitCost: 0.7, // energy spent per unit of plume strength emitted
+    alarmRate: 1.4, // voluntary alarm cries per second at full alarmVoice
+    alarmStrength: 2.2, // strength of a voluntary alarm cry (≈ a real kill's)
   },
 
   // Terrain: a static, seed-generated map of tiles under the world. Most of it
