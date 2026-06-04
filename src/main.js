@@ -111,6 +111,7 @@ function updateHud() {
     row("Food trust", s.avg.foodTrust.toFixed(2)),
     row("Alarm trust", s.avg.alarmTrust.toFixed(2)),
     row("Kinship", s.avg.kinship.toFixed(2)),
+    row("Mating", s.avg.mating.toFixed(2)),
   ].join("");
 }
 

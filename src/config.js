@@ -31,6 +31,12 @@ export const CONFIG = {
     // the cost and passing half its remaining energy to the child.
     reproduceThreshold: 200,
     reproduceCost: 90,
+    // Sexual reproduction: when a creature ready to breed rolls (by its `mating`
+    // gene) to reproduce sexually, it looks for a partner within this radius to
+    // recombine genomes with; finding none, it falls back to cloning. Generous
+    // enough that the clustering the scent/kin/herding layers already drive
+    // usually puts a partner in reach, without needing dedicated mate-seeking.
+    mateRadius: 90,
 
     maxAgeSeconds: 90, // soft cap; older creatures get a metabolism penalty
 

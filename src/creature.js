@@ -5,7 +5,7 @@
 // not from cleverness in any single individual.
 
 import { CONFIG } from "./config.js";
-import { randomGenome, mutate, genomeHue } from "./genome.js";
+import { randomGenome, mutate, crossover, genomeHue } from "./genome.js";
 import { wrapDelta } from "./math.js";
 import { weatherSenseFactor, windStrength, windDirection } from "./weather.js";
 import { SCENT } from "./scent.js";
@@ -303,7 +303,22 @@ export class Creature {
     const childEnergy = this.energy * 0.5;
     this.energy -= childEnergy;
 
-    const childGenome = mutate(this.genome, rng);
+    // Sexual vs. asexual reproduction is itself heritable, through the `mating`
+    // gene. With probability `mating` the creature seeks a partner; if one is in
+    // reach the child's genome is a crossover of both parents, so traits from two
+    // lineages recombine in one body. Otherwise — a low `mating`, or simply
+    // nobody nearby to pair with — it falls back to the asexual path: a mutated
+    // copy of its own genome, exactly as before. So sex never stalls reproduction
+    // for want of a mate; it only happens where there's someone to mix with. Only
+    // the initiator pays the energy cost (it's the one that hit the threshold);
+    // the partner just contributes genes.
+    let mate = null;
+    if (rng.chance(this.genome.mating)) {
+      mate = world.findMate(this, c.mateRadius);
+    }
+    const blended = mate ? crossover(this.genome, mate.genome, rng) : this.genome;
+    const childGenome = mutate(blended, rng);
+
     const angle = rng.range(0, Math.PI * 2);
     const offset = this.radius * 2;
     const child = new Creature(
@@ -313,7 +328,8 @@ export class Creature {
       rng,
     );
     child.energy = childEnergy;
-    child.generation = this.generation + 1;
+    child.generation =
+      (mate ? Math.max(this.generation, mate.generation) : this.generation) + 1;
     return child;
   }
 }
