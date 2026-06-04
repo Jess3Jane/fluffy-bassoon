@@ -3,6 +3,7 @@
 
 import { CONFIG } from "./config.js";
 import { daylight } from "./daycycle.js";
+import { weatherNoise } from "./weather.js";
 import { TILE } from "./terrain.js";
 
 // Fill colours per tile kind, indexed by the TILE enum. Grass doubles as the
@@ -87,6 +88,20 @@ export class Renderer {
     const darkness = 1 - daylight(world.time);
     if (darkness > 0.001) {
       ctx.fillStyle = `rgba(6, 10, 28, ${(darkness * 0.55).toFixed(3)})`;
+      ctx.fillRect(0, 0, world.width, world.height);
+    }
+
+    // Weather wash: rain greys the scene cool and blue, drought casts a dry warm
+    // haze, so the slower climate swing reads at a glance like the night veil.
+    // Only the stronger half of each spell shows, so fair weather stays clear.
+    const w = weatherNoise(world.time);
+    if (w > 0.15) {
+      const a = Math.min(0.22, (w - 0.15) * 0.32);
+      ctx.fillStyle = `rgba(70, 92, 120, ${a.toFixed(3)})`;
+      ctx.fillRect(0, 0, world.width, world.height);
+    } else if (w < -0.15) {
+      const a = Math.min(0.16, (-w - 0.15) * 0.24);
+      ctx.fillStyle = `rgba(120, 92, 44, ${a.toFixed(3)})`;
       ctx.fillRect(0, 0, world.width, world.height);
     }
 

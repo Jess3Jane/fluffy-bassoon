@@ -96,10 +96,28 @@ population dynamics, natural selection, and surprising behaviour.
       internal rng so it never perturbs the main simulation stream. The renderer
       paints a grass backdrop and lays the water/fertile/barren patches over it.
 
+- [x] Weather & seasons layered over the day-night cycle. Two slower rhythms
+      (`src/weather.js`) ride on top of the daily one, both *pure functions of
+      `world.time`* — so, like the day-night cycle, they add no serialized state,
+      stay bit-identical across save/load, and read the same at any speed.
+      **Seasons** are a slow raised-cosine "year" many days long (rich summers,
+      lean winters, with autumn cooling and spring warming between). **Weather**
+      flickers faster on top — rain spells and droughts drawn from deterministic
+      smooth 1-D value-noise sampled at the clock (a bit-mixing integer hash
+      interpolated with smoothstep, two octaves for texture). Their product is a
+      floored food multiplier that *multiplies* the day-night `foodGrowthFactor`
+      in `World.update`, so the larder now breathes on both a daily and a longer
+      boom/bust timescale. The renderer washes the scene cool-blue in rain and
+      dry-warm in drought (alongside the night veil), `stats()` surfaces the live
+      season/weather/climate values, and the HUD shows the season (Summer / Autumn
+      / Winter / Spring), the weather (Drought…Storm), and the combined climate
+      food percentage.
+
 ## Next up
 
-- [ ] Weather / seasons layered over the day-night cycle (rain boosting food,
-      droughts thinning it) for longer-period boom/bust dynamics.
+- [ ] Weather should also nudge movement and sensing, not just food — e.g. rain
+      damping sense range (harder to spot food through the downpour) or storms
+      buffeting headings — so spells shape behaviour as well as the food supply.
 
 ## Ideas / someday
 

@@ -57,6 +57,29 @@ export const CONFIG = {
     nightFoodGrowth: 0.2, // food growth at midnight, as a fraction of noon's
   },
 
+  // Weather & seasons: two slower rhythms layered over the day-night cycle, both
+  // pure functions of sim-time (so, like the day-night cycle, they add no saved
+  // state and read identically across save/load and playback speed). Together
+  // they scale food growth on top of the day-night modulation, driving the
+  // longer-period booms and busts the population rides.
+  weather: {
+    // Seasons: a slow raised-cosine swing many day-night periods long. Peak
+    // summer grows food richly; deep winter thins it. `amplitude` is the swing
+    // in the food multiplier (summer ×(1 + a), winter ×(1 − a)).
+    seasonSeconds: 360, // one full year (summer→winter→summer), in sim-time
+    seasonAmplitude: 0.45,
+
+    // Weather: short-lived rain/drought spells drawn from smooth 1-D value-noise
+    // over sim-time. `periodSeconds` is the characteristic length of a spell;
+    // `amplitude` is how hard rain boosts (and drought thins) the food multiplier.
+    periodSeconds: 22,
+    amplitude: 0.55,
+
+    // The combined season × weather multiplier never drops below this, so even a
+    // winter drought only slows the larder rather than stopping it dead.
+    foodFloor: 0.05,
+  },
+
   // Terrain: a static, seed-generated map of tiles under the world. Most of it
   // is ordinary grassland; wrapping value-noise carves out patches of water,
   // fertile soil, and barren ground that shape where food grows (`fertility`,

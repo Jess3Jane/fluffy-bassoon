@@ -9,6 +9,7 @@ import { SpatialGrid } from "./grid.js";
 import { GENES } from "./genome.js";
 import { wrapDistSq } from "./math.js";
 import { daylight, foodGrowthFactor } from "./daycycle.js";
+import { seasonLevel, weatherNoise, climateFoodFactor } from "./weather.js";
 import { Terrain } from "./terrain.js";
 
 // Largest a creature's body can get, used to size contact-query windows.
@@ -185,11 +186,16 @@ export class World {
   update(dt) {
     this.time += dt;
 
-    // Grow food over time, scaled by the day-night cycle: plants regrow fast in
-    // daylight and slowly at night, so the food supply (and the population that
-    // lives off it) breathes with the cycle.
+    // Grow food over time, scaled by two rhythms: the day-night cycle (fast by
+    // day, slow at night) and the slower season × weather climate (rich summers
+    // and rain spells boost it, lean winters and droughts thin it). Their product
+    // makes the larder — and the population that lives off it — breathe on both a
+    // daily and a longer boom/bust timescale.
     this.foodSpawnAccumulator +=
-      CONFIG.food.spawnPerSecond * foodGrowthFactor(this.time) * dt;
+      CONFIG.food.spawnPerSecond *
+      foodGrowthFactor(this.time) *
+      climateFoodFactor(this.time) *
+      dt;
     while (this.foodSpawnAccumulator >= 1) {
       this.spawnFood();
       this.foodSpawnAccumulator -= 1;
@@ -259,6 +265,9 @@ export class World {
       food: this.food.length,
       time: this.time,
       daylight: daylight(this.time),
+      season: seasonLevel(this.time),
+      weather: weatherNoise(this.time),
+      climateFood: climateFoodFactor(this.time),
       generation: maxGen,
       peak: this.peakPopulation,
       avgEnergy: energy,
