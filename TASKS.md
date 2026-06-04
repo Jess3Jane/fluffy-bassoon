@@ -534,6 +534,7 @@ population dynamics, natural selection, and surprising behaviour.
 
 ## Next up
 
+- [ ] Examine the PR 25 checkpoint screenshot
 - [ ] The forage split is purely *competitive* (who eats which plant); predation
       is still a single axis (`diet` herbivore↔carnivore) with one undifferentiated
       prey pool. A natural next step is to extend partitioning to the **second
