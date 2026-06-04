@@ -89,6 +89,7 @@ function updateHud() {
     row("Population", s.population),
     row("Peak", s.peak),
     row("Species", s.species),
+    row("Isolation", isolationRow(s.isolation)),
     row("Carnivores", s.carnivores),
     row("Food", s.food),
     row("Scent", s.scent),
@@ -129,6 +130,14 @@ function formatTime(sec) {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+// Realised reproductive isolation: the within-lineage share of recent sexual
+// matings, shown as a percentage once any are on record (and "—" before then,
+// rather than a misleading 0% when no creature has bred sexually yet).
+function isolationRow(isolation) {
+  if (isolation == null) return "—";
+  return `${Math.round(isolation * 100)}%`;
 }
 
 // The wind reads as "Calm" until a storm actually stirs one up; once it blows,

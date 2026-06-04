@@ -202,10 +202,21 @@ export const CONFIG = {
   // along the colour wheel, against `scent.kinTolerance` so a clade reads as one
   // species exactly as it reads as one kin group), and only clusters with at
   // least `minClusterSize` members count — so a lone mutant or a dying splinter
-  // doesn't inflate the count. Purely an observation derived from existing state;
-  // it changes nothing about the simulation and adds nothing to the save.
+  // doesn't inflate the count. The hue cluster count is purely an observation
+  // derived from existing state; it changes nothing about the simulation.
+  //
+  // Alongside that *structural* (colour) read sits a *realised* one: reproductive
+  // isolation. The hue count says how many clades exist by ancestry, but says
+  // nothing about whether they actually still interbreed — two diverged hue bands
+  // could still swap genes freely. So we also track, over a rolling window of the
+  // last `matingWindow` *sexual* matings, the share that stayed within a lineage
+  // (the two parents within `scent.kinTolerance` on the hue wheel) versus crossed
+  // into another. As assortative `mateChoice` and the courtship cost pull breeding
+  // inward, the cross-lineage share falls and isolation rises — that *fall is
+  // speciation happening*, the behavioural counterpart to the colour count.
   speciation: {
     minClusterSize: 3, // smallest hue cluster that counts as a distinct species
+    matingWindow: 200, // recent sexual matings the isolation read averages over
   },
 
   // Terrain: a static, seed-generated map of tiles under the world. Most of it

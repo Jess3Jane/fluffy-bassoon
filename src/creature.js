@@ -5,7 +5,7 @@
 // not from cleverness in any single individual.
 
 import { CONFIG } from "./config.js";
-import { randomGenome, mutate, crossover, genomeHue } from "./genome.js";
+import { randomGenome, mutate, crossover, genomeHue, hueSimilarity } from "./genome.js";
 import { wrapDelta, wrapDistSq } from "./math.js";
 import { weatherSenseFactor, windStrength, windDirection } from "./weather.js";
 import { SCENT } from "./scent.js";
@@ -328,6 +328,16 @@ export class Creature {
         wrapDistSq(this.x, this.y, mate.x, mate.y, world.width, world.height),
       );
       this.energy -= c.courtshipCost * (dist / c.mateRadius);
+
+      // Log this cross for the reproductive-isolation readout. A mating counts as
+      // *cross-lineage* when the partners sit more than `kinTolerance` apart on
+      // the hue wheel (hueSimilarity falls to 0 there) — the same threshold the
+      // kin/scent layers and the hue species count use to tell kin from stranger.
+      // So as assortative `mateChoice` keeps breeding within a clade, the logged
+      // cross-rate falls and realised isolation rises. Pure bookkeeping (no rng).
+      const cross =
+        hueSimilarity(this.lineageHue, mate.lineageHue, CONFIG.scent.kinTolerance) <= 0;
+      world.recordMating(cross);
     }
 
     const childEnergy = this.energy * 0.5;

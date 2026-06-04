@@ -405,21 +405,56 @@ population dynamics, natural selection, and surprising behaviour.
       bands, the 0/360-seam wrap, the no-break full ring, the size floor dropping a
       splinter, identical hues, and the wiring through `World.stats()`.
 
+- [x] Speciation now has a *behavioural* definition alongside the colour one —
+      realised reproductive isolation (option (b) of the prior seed). The hue
+      species count clusters by the neutral `lineageHue` marker, which tracks
+      *ancestry* but says nothing about whether two clades still actually
+      interbreed; this measures that directly. The world keeps a rolling ring of
+      the last `CONFIG.speciation.matingWindow` (200) **sexual** matings
+      (`World.recordMating`, `world.matingRing`), one bit each: 1 if the pairing
+      *crossed a lineage* — the two parents more than `scent.kinTolerance` apart
+      on the hue wheel, i.e. `hueSimilarity ≤ 0`, the very threshold the kin/scent
+      layers and the hue species count use to tell kin from stranger — and 0 if it
+      stayed within one. `Creature.reproduce` logs a bit for every two-parent
+      cross (right where it already pays the courtship toll), and *only* there:
+      the asexual clone path is no mating in this sense and logs nothing, so the
+      read reflects the sexual portion of breeding — itself gated by the `mating`
+      gene. `World.stats()` reports `matings` / `crossMatings` over the window and
+      `isolation = 1 − crossShare` (the within-lineage share), `null` until any
+      sexual mating is on record so the HUD shows "—" rather than a misleading 0%
+      before sex even happens. This is the behavioural counterpart the colour
+      count lacked: as assortative `mateChoice` and the distance-scaled courtship
+      cost pull breeding inward, the logged cross-rate falls and isolation rises —
+      *that fall is speciation happening*, and `mateChoice` + courtship cost are
+      exactly the levers that drive it. The ring is pure observation (it draws no
+      rng and feeds nothing back into the dynamics), so it never perturbs the
+      deterministic stream; it *is* accumulated state, so it serializes for a true
+      continuation — but an older save lacking the field loads with an empty ring
+      (the read just refills as breeding resumes) rather than being rejected, so
+      no `SAVE_VERSION` bump was needed. The HUD gains an **Isolation** row, the
+      `History` ring samples `isolation` like the other series, and `src/charts.js`
+      gains a fourth stacked sparkline panel (already a 0–1 quantity, so it needs
+      no scaling; the charts canvas grew to fit). `test/isolation.test.mjs` covers
+      the ring bookkeeping (fill, window cap, exact share, all-within / all-cross
+      edges), the reproduce wiring (within-lineage vs. cross classification, and
+      the asexual path logging nothing), and the serialize round-trip plus the
+      graceful empty-ring load of a legacy save.
+
 ## Next up
 
-- [ ] Speciation needs a *behavioural* definition, not just a colour one. The
-      readout above clusters by the neutral `lineageHue` marker, which tracks
-      ancestry but says nothing about whether two clades are actually
-      reproductively isolated *or* ecologically distinct — two clades could share
-      a hue band yet have diverged in diet/size, or sit in different hue bands yet
-      still interbreed freely. Consider either (a) a genetic-distance species
-      definition that clusters on the *adaptive* genes (diet, size, speed, …)
-      rather than the neutral marker, surfaced alongside the hue count so the two
-      can be compared; or (b) measuring realised reproductive isolation directly
-      (track the share of matings that cross hue clusters over a window — falling
-      cross-cluster mating *is* speciation happening, and `mateChoice` + courtship
-      cost are exactly the levers that should drive it down). Or pick another seed
-      below.
+- [ ] The two speciation reads now disagree usefully — but only the *neutral*
+      (hue) axis is covered. Reproductive isolation is measured along lineage hue,
+      and the species count clusters along lineage hue; neither looks at the
+      *adaptive* genome (diet, size, speed, …). So a clade that has split
+      ecologically — half of it turned carnivore, say — while keeping one hue band
+      reads as a single species by both measures. Consider option (a) from the
+      prior seed: a genetic-distance species count that clusters the live
+      population on its *adaptive* genes (single-linkage / connected-components in
+      normalised gene space, mirroring `countHueClusters`), surfaced alongside the
+      hue count so an ecological split that outruns the colour drift becomes
+      visible. Mind the cost — gene-space clustering is O(n²) per `stats()` call,
+      so it may want a population guard or a coarser bucketing than the 1-D hue
+      sort. Or pick another seed below.
 
 ## Ideas / someday
 
