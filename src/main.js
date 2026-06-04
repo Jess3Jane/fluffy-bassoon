@@ -89,6 +89,7 @@ function updateHud() {
     row("Population", s.population),
     row("Peak", s.peak),
     row("Species", s.species),
+    row("Eco species", s.geneSpecies == null ? "—" : s.geneSpecies),
     row("Isolation", isolationRow(s.isolation)),
     row("Carnivores", s.carnivores),
     row("Food", s.food),

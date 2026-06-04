@@ -440,21 +440,62 @@ population dynamics, natural selection, and surprising behaviour.
       the asexual path logging nothing), and the serialize round-trip plus the
       graceful empty-ring load of a legacy save.
 
+- [x] Ecological (adaptive-gene) species count, so an ecological split shows up
+      even when the neutral colour drift hasn't caught up. The hue species count
+      and the isolation ring both measure ancestry along the neutral `lineageHue`
+      marker; neither looks at the *adaptive* genome, so a clade that has split
+      ecologically — half of it turned carnivore — while keeping one hue band read
+      as a single species by both. This is option (a) of the prior seed: a
+      genetic-distance count that clusters the live population on its adaptive
+      genes. `countGeneClusters(genomes, threshold, minSize)` (`src/genome.js`) is
+      the multi-D mirror of `countHueClusters`: each genome maps to a point in
+      normalised gene space (`geneVector` — every gene in `GENES`, each scaled to
+      `[0,1]` against its range; the neutral hue is excluded), two points are
+      *linked* when they sit within `threshold` on *every* gene (**max-norm /
+      Chebyshev** closeness — the multi-D echo of the 1-D hue gap), and species are
+      the **single-linkage connected components** of that graph (union-find with
+      path-halving), tallying only components meeting the same `minClusterSize`
+      floor the hue count uses. Requiring closeness on *all* genes is the crux: a
+      real gap in any single adaptive gene (diet 0.1 vs 0.9, say) severs the link
+      and splits the cluster even while the hue stays one band — the disagreement
+      the readout exists to surface — whereas a mere *spread* with no gap (a
+      continuum of intermediates) still chains into one species, exactly as
+      speciation needs a gap rather than variance. `CONFIG.speciation.geneTolerance`
+      (0.4) is set above the within-clade per-generation drift (~0.12/gene std, so
+      a parent–child pair's largest-gene gap is typically ~0.25, and a 40-step
+      drift chain still reads as one species — the test asserts this) but well
+      below a full-range gene swing, so a clade reliably chains while a substantial
+      single-gene divergence reads as distinct. The clustering is O(n²), so it's
+      skipped above `CONFIG.speciation.maxClusterPop` (2000) and reported as `null`
+      there (HUD shows "—") rather than stalling the loop; the cheap O(n log n) hue
+      count is always computed. Pure observation derived from live state — it draws
+      no rng, changes nothing about the simulation, and adds nothing to the save
+      (no `SAVE_VERSION` bump). `World.stats()` collects the genomes in its existing
+      single pass and surfaces a `geneSpecies` count; the HUD gains an **Eco
+      species** row beside **Species**, the `History` ring samples it, and the
+      species chart panel plots it as a second line ("eco") sharing the hue
+      panel's axis (scaled to whichever peaks higher) so the two lines diverging
+      *is* an ecological split outrunning the colour drift. `test/gene-species.test.mjs`
+      covers `geneVector`, the empty/singleton/floor edges, identical genomes, the
+      single-gene split, the no-gap spread chaining into one, the all-genes max-norm
+      linkage rule, the size floor dropping a splinter, a drift chain staying one,
+      the wiring through `World.stats()` (one hue band split into two diet ecotypes
+      — the hue count says 1, the gene count says 2), and the population guard
+      returning null over the cap while the hue count still reports.
+
 ## Next up
 
-- [ ] The two speciation reads now disagree usefully — but only the *neutral*
-      (hue) axis is covered. Reproductive isolation is measured along lineage hue,
-      and the species count clusters along lineage hue; neither looks at the
-      *adaptive* genome (diet, size, speed, …). So a clade that has split
-      ecologically — half of it turned carnivore, say — while keeping one hue band
-      reads as a single species by both measures. Consider option (a) from the
-      prior seed: a genetic-distance species count that clusters the live
-      population on its *adaptive* genes (single-linkage / connected-components in
-      normalised gene space, mirroring `countHueClusters`), surfaced alongside the
-      hue count so an ecological split that outruns the colour drift becomes
-      visible. Mind the cost — gene-space clustering is O(n²) per `stats()` call,
-      so it may want a population guard or a coarser bucketing than the 1-D hue
-      sort. Or pick another seed below.
+- [ ] All three speciation reads are now *observations* — they measure structure
+      and behaviour but feed nothing back. The natural next step is to let an
+      ecological split have ecological *consequences*: a mechanism by which two
+      diverged ecotypes stop competing head-to-head. Consider **resource
+      partitioning / niche specialisation** — e.g. a heritable food-preference or
+      foraging gene so a clade can specialise on a sub-resource (different plant
+      kinds, or fast-vs-slow prey) and escape direct competition with its sister
+      ecotype, giving disruptive selection a concrete payoff and turning the
+      `geneSpecies` count from a passive readout into something the dynamics
+      actively drive toward. (This would likely want more than one food type —
+      currently all plants are interchangeable.) Or pick another seed below.
 
 ## Ideas / someday
 

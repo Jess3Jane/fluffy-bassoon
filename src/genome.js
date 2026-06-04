@@ -174,6 +174,78 @@ export function countHueClusters(hues, tolerance, minSize = 1) {
   return count;
 }
 
+// Normalise a genome's *adaptive* genes into a vector in [0, 1]^k — every gene
+// in GENES, each scaled against its own legal range. The neutral `lineageHue`
+// marker is deliberately excluded: this is the adaptive genome (diet, size,
+// speed, …) that the ecological species count clusters on, as opposed to the
+// ancestry-only hue the colour count uses.
+export function geneVector(genome) {
+  const v = [];
+  for (const name of Object.keys(GENES)) v.push(norm(name, genome[name]));
+  return v;
+}
+
+// Count distinct *ecological* species among a set of genomes by clustering their
+// adaptive genes — the multi-dimensional counterpart to `countHueClusters`. Each
+// genome is mapped to a point in normalised gene space (`geneVector`), and two
+// points are *linked* when they sit within `threshold` on *every* gene (max-norm
+// / Chebyshev closeness — the multi-D echo of the 1-D hue gap). Species are the
+// connected components of that graph (single-linkage: a clade chains together so
+// long as a path of close-on-every-gene neighbours connects it, even as it drifts
+// wider end-to-end), and only components with at least `minSize` members are
+// tallied so a lone mutant doesn't read as its own species.
+//
+// Because linkage requires closeness on *all* genes, a real gap in any single
+// adaptive gene — half a clade turning carnivore, say — severs the link and
+// splits the cluster, even while the neutral lineage hue stays one band. That is
+// the whole point: it sees an ecological split the hue count is blind to. A mere
+// *spread* across a gene (a continuum of intermediates with no gap) still chains
+// into one species, exactly as speciation requires a gap rather than variance.
+//
+// O(n²) in the population (every pair is tested), so callers should guard on
+// population size before invoking it on a large world.
+export function countGeneClusters(genomes, threshold, minSize = 1) {
+  const n = genomes.length;
+  if (n === 0) return 0;
+  const vecs = genomes.map(geneVector);
+  // Union-find over the "close on every gene" graph; each component is a species.
+  const parent = new Array(n);
+  for (let i = 0; i < n; i++) parent[i] = i;
+  const find = (x) => {
+    while (parent[x] !== x) {
+      parent[x] = parent[parent[x]]; // path halving
+      x = parent[x];
+    }
+    return x;
+  };
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      // Skip if already in the same component (cheaper than the gene compare).
+      if (find(i) === find(j)) continue;
+      if (withinThreshold(vecs[i], vecs[j], threshold)) parent[find(i)] = find(j);
+    }
+  }
+  // Tally component sizes; count those meeting the floor.
+  const sizes = new Map();
+  for (let i = 0; i < n; i++) {
+    const r = find(i);
+    sizes.set(r, (sizes.get(r) || 0) + 1);
+  }
+  let count = 0;
+  for (const size of sizes.values()) if (size >= minSize) count++;
+  return count;
+}
+
+// Two normalised gene vectors are "close" when no single gene differs by more
+// than `threshold` (Chebyshev / max-norm). Returns early on the first gene that
+// exceeds it, so distant pairs (the common case) cost only a gene or two.
+function withinThreshold(a, b, threshold) {
+  for (let k = 0; k < a.length; k++) {
+    if (Math.abs(a[k] - b[k]) > threshold) return false;
+  }
+  return true;
+}
+
 // Kin-similarity between two lineage hues, in [0, 1]: 1 when identical, falling
 // linearly to 0 once they are `tolerance` degrees apart on the colour wheel (a
 // stranger). Used to weight scent response toward kin. A null/undefined hue

@@ -214,9 +214,33 @@ export const CONFIG = {
   // into another. As assortative `mateChoice` and the courtship cost pull breeding
   // inward, the cross-lineage share falls and isolation rises — that *fall is
   // speciation happening*, the behavioural counterpart to the colour count.
+  // Alongside the *neutral* (hue) reads above sits an *adaptive* one. The hue
+  // count and the isolation ring both measure ancestry along the neutral
+  // lineageHue marker; neither looks at the adaptive genome, so a clade that has
+  // split ecologically — half of it turned carnivore — while keeping one hue band
+  // reads as a single species by both. The ecological species count clusters the
+  // live population on its adaptive genes instead (`countGeneClusters`, the
+  // multi-D mirror of `countHueClusters`): two creatures are the same species when
+  // no single adaptive gene differs by more than `geneTolerance` (max-norm), and
+  // species are the single-linkage connected components of that graph. So an
+  // ecological split (a real gap in any gene) shows up even while the colour drift
+  // hasn't caught up — surfaced beside the hue count so the two can disagree
+  // usefully.
   speciation: {
-    minClusterSize: 3, // smallest hue cluster that counts as a distinct species
+    minClusterSize: 3, // smallest cluster (hue or gene) that counts as a species
     matingWindow: 200, // recent sexual matings the isolation read averages over
+    // Max per-gene normalised difference for two genomes to count as the same
+    // ecological species under single-linkage. Set comfortably above the
+    // within-clade per-generation drift (~0.12/gene std, so a parent–child pair's
+    // largest-gene gap is typically ~0.25) so a clade reliably chains into one
+    // cluster, yet well below a full-range gene swing (1.0) so a substantial
+    // single-gene divergence with a real gap reads as a distinct species.
+    geneTolerance: 0.4,
+    // The gene-space clustering is O(n²); above this population it's skipped and
+    // the ecological species count reports null (the HUD shows "—") rather than
+    // stalling the loop on a very large world. The cheap O(n log n) hue count is
+    // always computed.
+    maxClusterPop: 2000,
   },
 
   // Terrain: a static, seed-generated map of tiles under the world. Most of it
