@@ -16,17 +16,21 @@ const NORM = CONFIG.creature.dilutionNorm;
 const STRENGTH = CONFIG.creature.dilutionStrength;
 const RADIUS = CONFIG.creature.dilutionRadius;
 
-// Drop a creature at a point and force its genome to a chosen diet/size so the
-// canEat relationship is exactly what each test wants. Returns the creature.
-function add(world, x, y, { diet, size }) {
+// Drop a creature at a point and force its genome to a chosen diet/size (and,
+// for a predator, prey-size preference) so the canEat / hunt relationship is
+// exactly what each test wants. Returns the creature.
+function add(world, x, y, { diet, size, hunt }) {
   const c = world.spawnCreature(x, y);
   c.genome.diet = diet;
   c.genome.size = size;
+  if (hunt !== undefined) c.genome.hunt = hunt;
   return c;
 }
 
-// A big carnivore that can overpower the small herbivores below it.
-const PRED = { diet: 1, size: 1.8 };
+// A big carnivore that can overpower the small herbivores below it. Its `hunt`
+// gene is pinned to the small-prey end so the prey-size specialism never gates
+// out the small victims here — this test is about crowd dilution, not niche.
+const PRED = { diet: 1, size: 1.8, hunt: 0 };
 // A small herbivore the predator can eat.
 const PREY = { diet: 0, size: 0.7 };
 

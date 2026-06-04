@@ -98,6 +98,22 @@ export const CONFIG = {
     meatEnergyEff: 0.6,
     meatBodyEnergy: 5,
 
+    // Prey-size specialism — the predator-niche mirror of plant-kind `forage`.
+    // A creature's heritable `hunt` gene is its preferred prey size (on the
+    // normalised `size` axis); `huntYield` meets it with a victim's actual size
+    // to set how much meat the kill yields: `eff = match^huntExponent`, where
+    // `match` is how close the preference lands on the prey (1 dead-on, 0 a full
+    // axis away). The exponent is > 1 so the curve is *convex* — a predator that
+    // hones onto one prey-size band out-yields one hunting across all sizes, the
+    // disruptive-selection pressure that lets carnivores split the prey pool by
+    // body size (fast-small vs. slow-large) the way grazers split the plants. A
+    // predator won't strike at prey whose `eff` is below `huntMinEff`, so a
+    // small-prey hunter leaves the big bodies for a large-prey ecotype (clean
+    // partitioning, not interference that strips a shared prey pool). Mirrors the
+    // forage constants so the two trophic levels partition on the same terms.
+    huntExponent: 1.4,
+    huntMinEff: 0.25,
+
     // Safety in numbers. A victim packed among other prey is harder to single
     // out — the strike is diluted and the predator confused by the press of
     // similar bodies. When a predator has a victim in reach, the catch is rolled

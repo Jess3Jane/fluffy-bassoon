@@ -39,6 +39,7 @@ export class History {
       food: stats.food,
       diet: stats.avg.diet,
       forage: stats.avg.forage,
+      hunt: stats.avg.hunt,
       speed: stats.avg.speed,
       size: stats.avg.size,
       sense: stats.avg.sense,

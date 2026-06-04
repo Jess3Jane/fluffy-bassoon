@@ -12,6 +12,7 @@ import {
   countHueClusters,
   countGeneClusters,
   forageYield,
+  huntYield,
 } from "./genome.js";
 import { wrapDistSq } from "./math.js";
 import { daylight, foodGrowthFactor } from "./daycycle.js";
@@ -41,11 +42,13 @@ const MAX_CREATURE_RADIUS = CONFIG.creature.radius * GENES.size[1];
 // pre-v7 genome lacks it, so its preference would be undefined). v8 added the
 // `forage` gene for plant-kind specialism *and* a per-pellet `kind` (a pre-v8
 // genome lacks forage, so its foraging would be undefined, and a pre-v8 pellet
-// carries no kind, so its yield would be undefined). The mating-isolation ring
-// added later is *not* a version bump: it's pure readout state an older save can
-// satisfy by simply loading empty, so it degrades gracefully rather than
-// rejecting the save (see `deserialize`).
-const SAVE_VERSION = 8;
+// carries no kind, so its yield would be undefined). v9 added the `hunt` gene
+// for prey-size specialism (a pre-v9 genome lacks it, so its predation yield
+// would be NaN-scaled). The mating-isolation ring added later is *not* a version
+// bump: it's pure readout state an older save can satisfy by simply loading
+// empty, so it degrades gracefully rather than rejecting the save (see
+// `deserialize`).
+const SAVE_VERSION = 9;
 
 export class World {
   // `seed: false` builds an empty world (no starting food/creatures, rng
@@ -183,12 +186,18 @@ export class World {
   }
 
   // Nearest creature `predator` is able to eat, within `radius`, or null.
-  // Relies on Creature.canEat for the size/diet rules.
+  // Relies on Creature.canEat for the size/diet rules, and on the predator's
+  // `hunt` prey-size specialism: prey too far off its preferred size (yield 0,
+  // below the floor) are left for a differently-tuned ecotype, so a small-prey
+  // hunter seeks small bodies and ignores the big ones (the predator-niche echo
+  // of a forage specialist seeking only its own plant kind).
   nearestPrey(predator, radius) {
+    const hunt = predator.genome.hunt;
     let best = null;
     let bestD = radius * radius;
     this.creatureGrid.forEachNear(predator.x, predator.y, radius, (c) => {
       if (c === predator || !c.alive || !predator.canEat(c)) return;
+      if (hunt !== undefined && huntYield(hunt, c.genome.size) <= 0) return;
       const d = wrapDistSq(predator.x, predator.y, c.x, c.y, this.width, this.height);
       if (d < bestD) {
         bestD = d;
@@ -203,10 +212,12 @@ export class World {
   // padded by the largest possible prey radius so no contact is missed.
   preyInReach(predator) {
     const window = predator.radius + MAX_CREATURE_RADIUS;
+    const hunt = predator.genome.hunt;
     let best = null;
     let bestD = Infinity;
     this.creatureGrid.forEachNear(predator.x, predator.y, window, (c) => {
       if (c === predator || !c.alive || !predator.canEat(c)) return;
+      if (hunt !== undefined && huntYield(hunt, c.genome.size) <= 0) return;
       const reach = predator.radius + c.radius;
       const d = wrapDistSq(predator.x, predator.y, c.x, c.y, this.width, this.height);
       if (d <= reach * reach && d < bestD) {
@@ -224,12 +235,16 @@ export class World {
   // victim and the predator itself, saturated against `dilutionNorm`. The catch
   // chance in `Creature.update` falls with this, so a victim buried in a herd is
   // harder to single out than a lone one. Uses the same creature grid and the
-  // same `canEat` rule as the predation queries.
+  // same `canEat` + `hunt` prey-size rules as the predation queries — only prey
+  // this predator would actually strike at confuse it, so a herd of large bodies
+  // does nothing to shield a small victim from a small-prey specialist.
   preyDensity(predator, victim, radius) {
+    const hunt = predator.genome.hunt;
     const r2 = radius * radius;
     let crowd = 0;
     this.creatureGrid.forEachNear(victim.x, victim.y, radius, (c) => {
       if (c === victim || c === predator || !c.alive || !predator.canEat(c)) return;
+      if (hunt !== undefined && huntYield(hunt, c.genome.size) <= 0) return;
       const d = wrapDistSq(victim.x, victim.y, c.x, c.y, this.width, this.height);
       if (d > r2) return;
       crowd++;
@@ -448,6 +463,7 @@ export class World {
       wander: 0,
       diet: 0,
       forage: 0,
+      hunt: 0,
       foodVoice: 0,
       alarmVoice: 0,
       foodTrust: 0,
@@ -468,6 +484,7 @@ export class World {
       avg.wander += c.genome.wander;
       avg.diet += c.genome.diet;
       avg.forage += c.genome.forage;
+      avg.hunt += c.genome.hunt;
       avg.foodVoice += c.genome.foodVoice;
       avg.alarmVoice += c.genome.alarmVoice;
       avg.foodTrust += c.genome.foodTrust;

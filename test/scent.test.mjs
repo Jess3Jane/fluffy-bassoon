@@ -105,10 +105,13 @@ const H = 800;
   }
   assert.ok(sawFood, "grazing creatures lay food-scent plumes");
 
-  // Force a kill: a big carnivore dropped on top of a small herbivore.
+  // Force a kill: a big carnivore dropped on top of a small herbivore. Pin its
+  // prey-size preference to the small end so the `hunt` specialism doesn't gate
+  // out the victim (this test is about the danger plume, not the niche).
   const big = world.spawnCreature(600, 400);
   big.genome.diet = 1;
   big.genome.size = 1.8;
+  big.genome.hunt = 0;
   const small = world.spawnCreature(600, 400);
   small.genome.diet = 0;
   small.genome.size = 0.6;
