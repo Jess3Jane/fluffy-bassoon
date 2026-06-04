@@ -1,0 +1,12 @@
+{
+  "name": "fluffy-bassoon",
+  "version": "0.1.0",
+  "description": "An evolving creature ecosystem — a complex simulated world in the browser.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node test/smoke.mjs",
+    "serve": "node --version >/dev/null && python3 -m http.server 8000"
+  },
+  "license": "MIT"
+}
