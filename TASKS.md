@@ -231,19 +231,51 @@ population dynamics, natural selection, and surprising behaviour.
       creature draws no rng and is skipped by every query.) `stats()` averages
       `kinship` and the HUD shows a **Kinship** row.
 
+- [x] Kin-weighted *emission*, the other half of the lever. Response-side kin
+      recognition let a creature choose *whom to heed*, but a loud caller still
+      paid the full energy cost of advertising to everyone within earshot, kin or
+      not. Now a creature also modulates *how loudly* it calls by how many close
+      kin are nearby. `World.kinDensity(self, radius)` is the cheap read: it scans
+      the existing creature grid within the smeller's `sense` reach and sums each
+      live neighbour's `hueSimilarity` to `self` (1 for a clone, fading to 0 past
+      `kinTolerance`), squashed to `[0,1]` against `scent.kinDensityNorm` — the
+      hue-weighted kin count at which the read saturates. The food call laid on
+      feeding (`Creature.update`) is then gated by it through the *same* `kinship`
+      gene that gates the response, with the exact mirror of the steer weight:
+      `kinGain = 1 − kinship·(1 − density)`. So a kin-blind creature (`kinship` 0)
+      calls at full `foodVoice` regardless of who's around (the old behaviour, so
+      every prior caller/test is unchanged), while a kin-tuned one hushes among
+      strangers — where broadcasting only feeds competitors — and calls up to full
+      voice when relatives cluster around to benefit. Crucially the hush is
+      *free*: a gated-down plume falls below the decay floor, so `Creature.signal`
+      skips it and spends no energy, exactly the "quiet for free, pay only when it
+      pays" economics the inclusive-fitness payoff needs. Reusing `kinship` (no new
+      gene, no `SAVE_VERSION` bump) is what makes `foodVoice` and `kinship`
+      co-evolve rather than only the latter doing the filtering. The flagged
+      failure mode — collapse to silence everywhere — can't take hold by
+      construction: the gate is gene-controlled and vanishes at `kinship` 0, so
+      selection (not the mechanic) decides whether kin-gated calling beats
+      kin-blind calling, on each clade's own terms. Emission draws no fresh rng,
+      so a restored world still replays bit-identically; `test/kin-emission.test.mjs`
+      covers the density read (saturation, hue-weighting, radius cutoff) and the
+      gated call (kin-blind full voice, kin-loud, stranger-silent-and-free, graded
+      between).
+
 ## Next up
 
-- [ ] Kin-weighted *emission*, the other half of the lever. Response-side kin
-      recognition (above) lets a creature choose *whom to heed*, but a loud
-      caller still pays the full energy cost of advertising to everyone within
-      earshot, kin or not. Let a creature also modulate *how loudly* it calls by
-      how many close kin are nearby (a cheap kin-density read off the creature
-      grid + `lineageHue`), so it can stay quiet among strangers and call up when
-      relatives are around to benefit — sharpening the inclusive-fitness payoff
-      and making `foodVoice` and `kinship` co-evolve rather than only the latter
-      doing the filtering. Watch for the failure mode where this just collapses to
-      silence everywhere; if so, the kin-density read may need to *raise* the call
-      rather than gate it.
+- [ ] Safety in numbers, so kin clustering has a survival payoff beyond
+      signalling. Kin-weighted emission now pulls relatives together around food,
+      but grouping carries no direct benefit yet — a predator catches a lone
+      grazer exactly as easily as one in a crowd. Add a dilution / confusion
+      effect: a prey creature's chance of actually being caught in `preyInReach`
+      (or the energy a predator extracts) drops with how many other prey are
+      packed around the victim, read off the creature grid like `kinDensity`. That
+      gives flocking an emergent anti-predator value, so herds can form for
+      defence and predators must work to cut an animal out of one — a second
+      reason (besides scent payoff) for the population to aggregate. Watch the
+      knobs so it doesn't make predation impossible (a stable herd that can never
+      be eaten starves its predators and then itself); the dilution should make a
+      kill *harder*, not *unwinnable*.
 
 ## Ideas / someday
 

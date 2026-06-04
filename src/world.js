@@ -6,7 +6,7 @@
 import { CONFIG } from "./config.js";
 import { Creature, reserveIds } from "./creature.js";
 import { SpatialGrid } from "./grid.js";
-import { GENES } from "./genome.js";
+import { GENES, hueSimilarity } from "./genome.js";
 import { wrapDistSq } from "./math.js";
 import { daylight, foodGrowthFactor } from "./daycycle.js";
 import {
@@ -179,6 +179,27 @@ export class World {
       }
     });
     return best;
+  }
+
+  // Local kin density around `self` within `radius`, squashed to [0, 1]. Each
+  // live neighbour contributes its lineage-hue similarity to `self` (1 for a
+  // clone, fading to 0 for a stranger past `kinTolerance`), and the sum is
+  // saturated against `kinDensityNorm` — the hue-weighted kin count at which the
+  // read tops out. This is the cheap "are my relatives around?" read behind
+  // kin-weighted *emission*: a creature calls louder when kin are near to
+  // benefit and hushes among strangers, mirroring the kin-weighted *response*
+  // in `ScentField.steer`. Uses the same creature grid as the predation queries.
+  kinDensity(self, radius) {
+    const tol = CONFIG.scent.kinTolerance;
+    const r2 = radius * radius;
+    let kin = 0;
+    this.creatureGrid.forEachNear(self.x, self.y, radius, (c) => {
+      if (c === self || !c.alive) return;
+      const d = wrapDistSq(self.x, self.y, c.x, c.y, this.width, this.height);
+      if (d > r2) return;
+      kin += hueSimilarity(self.lineageHue, c.lineageHue, tol);
+    });
+    return Math.min(1, kin / CONFIG.scent.kinDensityNorm);
   }
 
   // Mark food within `radius` of a point as eaten and return the count. The

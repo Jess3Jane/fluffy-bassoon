@@ -141,6 +141,18 @@ export const CONFIG = {
     // enough to span a clade (lineageHue drifts ~`mutation.lineageDrift`°/gen)
     // but narrow enough that long-diverged lineages read as strangers.
     kinTolerance: 40,
+
+    // Kin-weighted *emission*. Beyond choosing whom to heed, a creature also
+    // tunes how loudly it calls by how many close kin are within earshot — read
+    // off the creature grid as a hue-weighted count, saturating at this many
+    // kin. The `kinship` gene gates the modulation exactly as it gates the
+    // response: at kinship 0 the call is unmodulated (old behaviour); as kinship
+    // rises a creature with no kin around hushes (its call costs nothing and is
+    // forgotten before anyone smells it) and one among relatives calls at full
+    // voice — so the energy of advertising is spent only when kin are there to
+    // benefit, sharpening the inclusive-fitness payoff that food signalling lives
+    // or dies by.
+    kinDensityNorm: 3, // hue-weighted kin count at which the emission read saturates
   },
 
   // Terrain: a static, seed-generated map of tiles under the world. Most of it
