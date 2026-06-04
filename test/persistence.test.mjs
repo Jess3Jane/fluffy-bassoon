@@ -20,7 +20,7 @@ function fingerprint(world) {
     kills: world.kills,
     peak: world.peakPopulation,
     rngState: world.rng.getState(),
-    food: world.food.map((f) => [f.x, f.y]),
+    food: world.food.map((f) => [f.x, f.y, f.kind]),
     creatures: world.creatures.map((c) => ({
       x: c.x,
       y: c.y,

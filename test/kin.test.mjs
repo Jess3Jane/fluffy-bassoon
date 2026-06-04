@@ -102,6 +102,8 @@ const TOL = CONFIG.scent.kinTolerance;
   const c = world.spawnCreature(600, 400);
   c.energy = 200;
   c.genome.foodVoice = 1;
+  c.genome.diet = 0; // a grazer, so it eats plants and lays a food plume
+  c.genome.forage = 0.5; // a generalist, so it eats either plant kind
   // Drop food right on top of it and step once so it feeds and signals.
   world.spawnFood(600, 400);
   world.update(1 / 60);

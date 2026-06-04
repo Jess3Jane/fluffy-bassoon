@@ -4,8 +4,8 @@ An evolving creature ecosystem that runs entirely in your browser — a complex
 simulated world where emergent complexity is the whole point.
 
 Hundreds of creatures roam a toroidal world looking for food. Each carries a
-small **genome** (speed, sense range, size, metabolism, wanderlust, and
-**diet**). Eating gives energy; moving and living spend it. When a creature has
+small **genome** (speed, sense range, size, metabolism, wanderlust, **diet**, and
+which plant kind it prefers to **forage**). Eating gives energy; moving and living spend it. When a creature has
 enough energy it splits in two, passing on a mutated copy of its genome. There
 is no fitness function — survival *is* the fitness function, so the population
 evolves on its own. Watch traits drift, populations boom and crash, and lineages
@@ -16,6 +16,20 @@ plants, while carnivores hunt creatures they can out-size, gaining meat instead.
 Specialising at either end is more efficient than sitting in the middle, so a
 **second trophic level** emerges on its own — and the carnivore share rises and
 falls with the supply of prey.
+
+The plants themselves come in **two kinds**, growing in distinct patches across
+the map (a green species and a violet one), and a heritable `forage` gene sets
+which a grazer is suited to eat. Specialising on one kind pays better than hedging
+across both — the yield curve is convex, so two specialists out-earn one
+generalist — and a specialist simply leaves the other kind's plants untouched,
+so a clade can split onto a sub-resource and stop competing head-to-head with its
+sister ecotype. The payoff is **frequency-dependent**: when too many graze one
+kind, the other piles up unexploited and selection pulls a lineage over to claim
+it. So **resource partitioning** emerges on its own — distinct foraging ecotypes
+coexist, each on its own plant in its own patches — and because `forage` is part
+of the adaptive genome, that split shows up directly in the *Eco species* count,
+turning it from a passive readout into something the dynamics actively drive
+toward.
 
 A **day-night cycle** rides over all of it: daylight rises and falls on a fixed
 rhythm, and food regrows fast in the light but slowly in the dark. The larder —

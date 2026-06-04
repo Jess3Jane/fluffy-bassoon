@@ -13,6 +13,31 @@ export const CONFIG = {
     spawnPerSecond: 70, // new plants seeded into the world each second
     energy: 26, // energy a creature gains from eating one plant
     radius: 3,
+
+    // Two plant kinds (0 and 1) — a sub-resource axis creatures can partition
+    // along. A pellet's kind is a pure function of where it sprouts (a smooth
+    // sine patchwork, `plantKindAt` in world.js), so the two species grow in
+    // distinct regions of the map: a *spatial* niche, and one that adds no rng
+    // draw, so plant kinds don't perturb the deterministic stream.
+    kinds: 2,
+
+    // Foraging specialism. A creature's heritable `forage` gene (0 → kind 0,
+    // 1 → kind 1, 0.5 → generalist) meets a plant's kind to set how much energy
+    // it extracts: `eff = match^forageExponent`, where `match` is how well the
+    // gene aligns with the kind (1 = perfectly specialised on it, 0 = the
+    // opposite specialism, 0.5 = a generalist on either). The exponent is > 1 so
+    // the curve is *convex* — two specialists out-yield one generalist, the
+    // disruptive-selection pressure that drives a clade to split onto separate
+    // resources. A creature won't consume a plant whose `eff` is below
+    // `forageMinEff`, so a specialist leaves the other kind untouched (clean
+    // niche partitioning rather than wastefully eating what it can barely use,
+    // which would be interference competition that opposes the split). The band
+    // of `forage` values clearing the floor on *both* kinds is the generalist
+    // niche; outside it a creature eats only one kind. A matched specialist
+    // still gets full yield (match 1 → eff 1), so the absolute food economy is
+    // roughly unchanged — generalism is the discount, specialism the payoff.
+    forageExponent: 1.4,
+    forageMinEff: 0.25,
   },
 
   creature: {
