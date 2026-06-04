@@ -170,15 +170,43 @@ population dynamics, natural selection, and surprising behaviour.
       paints plumes as soft green/red hazes under the food, `stats()` surfaces the
       live plume count, and the HUD shows a **Scent** row.
 
+- [x] Scent *signalling* is now heritable, so it evolves under selection instead
+      of firing as a fixed reflex. Four genes join the genome (`src/genome.js`,
+      all in `[0,1]` so mutation clamps them like any other gene): a **voice** for
+      each plume kind (`foodVoice`, `alarmVoice`) sets how loudly the creature
+      emits it, and a **trust** for each (`foodTrust`, `alarmTrust`) scales how
+      strongly it heeds that plume on the air (`ScentField.steer` now multiplies
+      each kind's pull by the smeller's trust, defaulting to 1 so old callers are
+      unchanged). Emission costs energy in proportion to loudness (`Creature.signal`
+      spends `scent.emitCost` × strength and skips any plume too faint to outlast
+      the decay floor — so near-silence is free), which makes silence a viable
+      strategy and advertising a gamble. The food plume a grazer drops is now
+      scaled by `foodVoice`; on top of the involuntary blood a kill still spills,
+      a creature can also **cry wolf** — lay a *voluntary* danger plume (up to
+      `scent.alarmRate`/sec, scaled by `alarmVoice`), indistinguishable on the air
+      from real blood. Splitting emit from response per kind is what opens the
+      strategy space the field was built for: an honest crier warns neighbours of
+      a hunt, while a **deceiver** pairs a loud `alarmVoice` with a deaf
+      `alarmTrust` to scatter rival grazers off contested food while standing its
+      own ground. The cry draws on the main rng, so it replays bit-identically
+      across save/load (the genes ride the existing genome serialization;
+      `SAVE_VERSION` bumped to 4 so a pre-signalling save is rejected rather than
+      loaded as a NaN-steered creature). `stats()` averages the four new traits
+      and the HUD shows a **signalling** block (food/alarm voice and trust), so
+      the population's drift toward honesty, silence, or deception is legible.
+
 ## Next up
 
-- [ ] Make scent *signalling* heritable, so it evolves under selection rather
-      than being a fixed reflex. Add genome genes for how strongly a creature
-      emits each plume (a "loudness") and how strongly it responds to each
-      (a "trust"), with emission carrying a small energy cost — so the field
-      becomes an arena for honest signalling, eavesdropping, silence, and even
-      deceptive "danger" calls that scatter competitors, all emerging from the
-      same plume field the wind already carries.
+- [ ] Kin recognition, so cooperation has something to select for. Right now
+      honest *food* signalling is pure altruism — broadcasting your larder only
+      feeds competitors — so `foodVoice` has no upward pressure and should erode
+      to silence. Give creatures a cheap way to tell kin from strangers (the
+      neutral `lineageHue` marker is already inherited and drifts per
+      generation, so a creature could weight its signals — or its trust — by hue
+      similarity to those nearby), so a loud larder-call that mostly helps close
+      relatives can pay off through inclusive fitness. That turns the signalling
+      arena from "silence always wins" into a tension between kin-directed
+      honesty and stranger-directed deception.
 
 ## Ideas / someday
 

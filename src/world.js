@@ -24,8 +24,10 @@ const MAX_CREATURE_RADIUS = CONFIG.creature.radius * GENES.size[1];
 
 // Bump when the serialized shape changes in a way old saves can't satisfy, so
 // stale data is rejected rather than loaded into a mismatched world. v2 added
-// the terrain seed; v3 added the scent / pheromone field.
-const SAVE_VERSION = 3;
+// the terrain seed; v3 added the scent / pheromone field; v4 added the heritable
+// scent-signalling genes (a pre-v4 genome lacks them, so its behaviour would be
+// undefined — better to reject the save than load a NaN-steered creature).
+const SAVE_VERSION = 4;
 
 export class World {
   // `seed: false` builds an empty world (no starting food/creatures, rng
@@ -282,7 +284,17 @@ export class World {
   // Aggregate stats for the HUD.
   stats() {
     const n = this.creatures.length;
-    const avg = { speed: 0, sense: 0, size: 0, wander: 0, diet: 0 };
+    const avg = {
+      speed: 0,
+      sense: 0,
+      size: 0,
+      wander: 0,
+      diet: 0,
+      foodVoice: 0,
+      alarmVoice: 0,
+      foodTrust: 0,
+      alarmTrust: 0,
+    };
     let maxGen = 0;
     let energy = 0;
     let carnivores = 0;
@@ -292,6 +304,10 @@ export class World {
       avg.size += c.genome.size;
       avg.wander += c.genome.wander;
       avg.diet += c.genome.diet;
+      avg.foodVoice += c.genome.foodVoice;
+      avg.alarmVoice += c.genome.alarmVoice;
+      avg.foodTrust += c.genome.foodTrust;
+      avg.alarmTrust += c.genome.alarmTrust;
       energy += c.energy;
       if (c.genome.diet > CONFIG.creature.carnivoreThreshold) carnivores++;
       if (c.generation > maxGen) maxGen = c.generation;

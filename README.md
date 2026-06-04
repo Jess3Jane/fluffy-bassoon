@@ -47,6 +47,20 @@ through water, so it becomes a natural barrier and refuge that shapes where life
 concentrates. The map is grown from a single seed (saved with the world, so it
 returns intact on load) using wrapping noise, so every world looks different.
 
+The wind also carries **scent**. Creatures lay faint pheromone plumes as they
+live — a "food here" plume while grazing, and a strong "danger" plume of blood
+where one is killed — and others smell the field on the air, drawn toward or
+away by diet (grazers chase food scent and flee blood; predators home in on the
+blood). The same gale that herds bodies smears these plumes into downwind trails,
+so flocking and avoidance emerge from a field the wind was already moving. And
+the signalling is **heritable**: genes set how loudly each creature emits each
+plume (a "voice") and how strongly it heeds each (a "trust"), with every emission
+costing energy. A creature can even *cry wolf* — lay a voluntary danger plume
+indistinguishable from real blood. So the field is an evolutionary arena: silence
+is free, honesty is a gamble, eavesdropping is cheap, and a deceiver that shouts
+"danger" with a deaf ear can scatter rivals off contested food. Watch the
+signalling traits in the HUD drift as selection sorts it out.
+
 ## Run it
 
 It's a static site with no build step. Either open `index.html` through a local
@@ -79,7 +93,9 @@ Or just use the deployed GitHub Pages site.
   the current time of day (Day / Dusk / Night / Dawn with a daylight percentage),
   the season (Summer / Autumn / Winter / Spring), weather (Drought … Storm, with
   the combined climate food percentage), the wind (Calm, or a compass bearing and
-  strength once a storm raises one), and average traits (including diet).
+  strength once a storm raises one), the live scent-plume count, and average
+  traits — including diet and the four heritable signalling traits (food/alarm
+  voice and trust).
 - Two **history charts** in the HUD trace the world over time: a population
   panel (total population with the carnivore sub-band) and an average-trait
   panel (diet plus speed/size normalised onto a shared 0–1 axis), so you can

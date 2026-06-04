@@ -13,6 +13,19 @@ export const GENES = {
   wander: [0.0, 1.0], // tendency to roam vs. beeline to food
   metabolismEff: [0.7, 1.3], // efficiency multiplier on living cost
   diet: [0.0, 1.0], // 0 = pure herbivore (plants), 1 = pure carnivore (prey)
+
+  // Scent signalling: how the creature uses the shared pheromone field. These
+  // turn the plume layer from a fixed reflex into something selection acts on,
+  // so honest signalling, silence, eavesdropping, and deception can all evolve.
+  // A "voice" controls how loudly it emits a plume (each emission costs energy);
+  // a "trust" controls how strongly it heeds that plume on the air. Splitting
+  // emit from response per kind is what lets, e.g., a deceiver cry "danger"
+  // loudly (high alarmVoice) while ignoring the channel itself (low alarmTrust)
+  // to scatter rivals off contested food.
+  foodVoice: [0.0, 1.0], // loudness of the "food here" plume laid while feeding
+  alarmVoice: [0.0, 1.0], // loudness/rate of voluntary "danger" (alarm) cries
+  foodTrust: [0.0, 1.0], // how strongly food scent steers this creature
+  alarmTrust: [0.0, 1.0], // how strongly danger scent steers this creature
 };
 
 export function randomGenome(rng) {

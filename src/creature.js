@@ -91,6 +91,17 @@ export class Creature {
     this.energy = Math.min(CONFIG.creature.maxEnergy, this.energy + amount);
   }
 
+  // Lay a plume on the scent field and pay for it. Emission costs energy in
+  // proportion to how loud the plume is, so signalling is never free. A plume
+  // too faint to outlast the field's decay floor is skipped — it would be
+  // forgotten before anyone smelled it, so there's no sense paying for it (and a
+  // gene tuned near-silent ends up effectively, and freely, mute).
+  signal(world, kind, strength) {
+    if (strength <= CONFIG.scent.minStrength) return;
+    world.scent.emit(this.x, this.y, kind, strength);
+    this.energy -= CONFIG.scent.emitCost * strength;
+  }
+
   // Whether this creature is physically able to prey on `other`: it must be
   // carnivorous enough to bother and large enough to overpower it.
   canEat(other) {
@@ -162,7 +173,14 @@ export class Creature {
     // — smell carries when sight fails — so it complements the weather-fogged eye.
     // The nudge scales with the local scent gradient, so a strong, close trail
     // turns a creature firmly while a faint whiff barely deflects it. ---
-    const steer = world.scent.steer(this.x, this.y, g.diet, g.sense);
+    const steer = world.scent.steer(
+      this.x,
+      this.y,
+      g.diet,
+      g.sense,
+      g.foodTrust,
+      g.alarmTrust,
+    );
     if (steer.dx !== 0 || steer.dy !== 0) {
       const desiredScent = Math.atan2(steer.dy, steer.dx);
       const towardScent = wrapAngle(desiredScent - this.heading);
@@ -185,8 +203,11 @@ export class Creature {
       const eaten = world.consumeFoodNear(this.x, this.y, reach);
       if (eaten > 0) {
         this.gain(eaten * CONFIG.food.energy * (1 - g.diet));
-        // Leave a "food here" plume on the air for others to follow.
-        world.scent.emit(this.x, this.y, SCENT.FOOD, CONFIG.scent.foodStrength);
+        // Leave a "food here" plume on the air for others to follow — but only as
+        // loudly as the `foodVoice` gene dictates, and at an energy price. A
+        // silent grazer keeps its larder secret for free; a loud one pays to
+        // advertise it (a cost only worth bearing if being heard ever helps).
+        this.signal(world, SCENT.FOOD, CONFIG.scent.foodStrength * g.foodVoice);
       }
     }
 
@@ -204,6 +225,18 @@ export class Creature {
         // the wind that sends other prey fleeing and draws other predators in.
         world.scent.emit(victim.x, victim.y, SCENT.DANGER, CONFIG.scent.dangerStrength);
       }
+    }
+
+    // --- Cry wolf. Beyond the involuntary blood a kill spills, a creature can
+    // *choose* to lay a danger plume — a voluntary alarm, indistinguishable on
+    // the air from real blood. How often it cries scales with the `alarmVoice`
+    // gene (capped at `alarmRate`/sec), and each cry costs energy. An honest
+    // crier warns neighbours of a hunt; a deceiver pairs a loud voice with a deaf
+    // ear (low `alarmTrust`, set above) to scatter rival grazers off contested
+    // food while standing its own ground. The draw is on the main rng, so the
+    // cry replays bit-identically across save/load. ---
+    if (g.alarmVoice > 0 && rng.chance(g.alarmVoice * CONFIG.scent.alarmRate * dt)) {
+      this.signal(world, SCENT.DANGER, CONFIG.scent.alarmStrength);
     }
 
     // --- Metabolise. ---
