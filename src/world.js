@@ -1,10 +1,16 @@
-// The world owns all entities and advances the simulation. For this first
-// version food and creature queries are linear scans; spatial partitioning is
-// on the roadmap (TASKS.md) for when populations get large.
+// The world owns all entities and advances the simulation. Neighbour queries
+// (nearest food, nearest prey, contact) go through uniform spatial grids
+// (`src/grid.js`) so they stay cheap as populations grow, instead of scanning
+// every entity on every lookup.
 
 import { CONFIG } from "./config.js";
 import { Creature } from "./creature.js";
+import { SpatialGrid } from "./grid.js";
+import { GENES } from "./genome.js";
 import { wrapDistSq } from "./math.js";
+
+// Largest a creature's body can get, used to size contact-query windows.
+const MAX_CREATURE_RADIUS = CONFIG.creature.radius * GENES.size[1];
 
 export class World {
   constructor(rng) {
@@ -12,7 +18,12 @@ export class World {
     this.width = CONFIG.world.width;
     this.height = CONFIG.world.height;
     this.creatures = [];
-    this.food = []; // array of { x, y }
+    this.food = []; // array of { x, y, dead? }
+
+    // Spatial indices, rebuilt each step before the creature loop runs.
+    this.foodGrid = new SpatialGrid(this.width, this.height, CONFIG.spatial.cellSize);
+    this.creatureGrid = new SpatialGrid(this.width, this.height, CONFIG.spatial.cellSize);
+
     this.foodSpawnAccumulator = 0;
     this.time = 0;
     this.births = 0;
@@ -39,70 +50,71 @@ export class World {
     });
   }
 
-  // Nearest food to a point within `radius`, or null. Linear scan.
+  // Nearest food to a point within `radius`, or null. Uses the food grid.
   nearestFood(x, y, radius) {
-    const r2 = radius * radius;
     let best = null;
-    let bestD = r2;
-    for (const f of this.food) {
+    let bestD = radius * radius;
+    this.foodGrid.forEachNear(x, y, radius, (f) => {
+      if (f.dead) return;
       const d = wrapDistSq(x, y, f.x, f.y, this.width, this.height);
       if (d < bestD) {
         bestD = d;
         best = f;
       }
-    }
+    });
     return best;
   }
 
   // Nearest creature `predator` is able to eat, within `radius`, or null.
-  // Linear scan; relies on Creature.canEat for the size/diet rules.
+  // Relies on Creature.canEat for the size/diet rules.
   nearestPrey(predator, radius) {
-    const r2 = radius * radius;
     let best = null;
-    let bestD = r2;
-    for (const c of this.creatures) {
-      if (c === predator || !c.alive || !predator.canEat(c)) continue;
+    let bestD = radius * radius;
+    this.creatureGrid.forEachNear(predator.x, predator.y, radius, (c) => {
+      if (c === predator || !c.alive || !predator.canEat(c)) return;
       const d = wrapDistSq(predator.x, predator.y, c.x, c.y, this.width, this.height);
       if (d < bestD) {
         bestD = d;
         best = c;
       }
-    }
+    });
     return best;
   }
 
   // Nearest catchable creature actually in contact with `predator`, or null.
-  // Contact means the two bodies overlap (sum of radii).
+  // Contact means the two bodies overlap (sum of radii). The query window is
+  // padded by the largest possible prey radius so no contact is missed.
   preyInReach(predator) {
+    const window = predator.radius + MAX_CREATURE_RADIUS;
     let best = null;
     let bestD = Infinity;
-    for (const c of this.creatures) {
-      if (c === predator || !c.alive || !predator.canEat(c)) continue;
+    this.creatureGrid.forEachNear(predator.x, predator.y, window, (c) => {
+      if (c === predator || !c.alive || !predator.canEat(c)) return;
       const reach = predator.radius + c.radius;
       const d = wrapDistSq(predator.x, predator.y, c.x, c.y, this.width, this.height);
       if (d <= reach * reach && d < bestD) {
         bestD = d;
         best = c;
       }
-    }
+    });
     return best;
   }
 
-  // Remove and count food within `radius` of a point. Returns count eaten.
+  // Mark food within `radius` of a point as eaten and return the count. The
+  // food is flagged rather than spliced out immediately so the grid we're
+  // iterating stays stable; eaten food is skipped by subsequent queries this
+  // step and compacted out at the end of `update`.
   consumeFoodNear(x, y, radius) {
     const r2 = radius * radius;
     let eaten = 0;
-    // Iterate backwards so splicing is safe.
-    for (let i = this.food.length - 1; i >= 0; i--) {
-      const f = this.food[i];
+    this.foodGrid.forEachNear(x, y, radius, (f) => {
+      if (f.dead) return;
       const d = wrapDistSq(x, y, f.x, f.y, this.width, this.height);
       if (d <= r2) {
-        // swap-remove for O(1) deletion
-        this.food[i] = this.food[this.food.length - 1];
-        this.food.pop();
+        f.dead = true;
         eaten++;
       }
-    }
+    });
     return eaten;
   }
 
@@ -115,6 +127,14 @@ export class World {
       this.spawnFood();
       this.foodSpawnAccumulator -= 1;
     }
+
+    // (Re)build the spatial indices from the current entities so this step's
+    // neighbour queries are cheap. Creatures move during the loop below, but
+    // queries read each creature's live position — only its *cell* is fixed at
+    // build time, and per-step movement is tiny next to a cell, so it stays
+    // within the queried window.
+    this.foodGrid.rebuild(this.food);
+    this.creatureGrid.rebuild(this.creatures);
 
     // Advance creatures. New children are collected and added after the loop
     // so they don't get a turn until next step.
@@ -130,6 +150,16 @@ export class World {
       else this.deaths++;
     }
     this.creatures = survivors.concat(newborns);
+
+    // Drop food eaten this step (flagged by consumeFoodNear).
+    let eaten = false;
+    for (const f of this.food) {
+      if (f.dead) {
+        eaten = true;
+        break;
+      }
+    }
+    if (eaten) this.food = this.food.filter((f) => !f.dead);
 
     if (this.creatures.length > this.peakPopulation) {
       this.peakPopulation = this.creatures.length;
