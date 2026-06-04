@@ -9,13 +9,15 @@ import { SpatialGrid } from "./grid.js";
 import { GENES } from "./genome.js";
 import { wrapDistSq } from "./math.js";
 import { daylight, foodGrowthFactor } from "./daycycle.js";
+import { Terrain } from "./terrain.js";
 
 // Largest a creature's body can get, used to size contact-query windows.
 const MAX_CREATURE_RADIUS = CONFIG.creature.radius * GENES.size[1];
 
 // Bump when the serialized shape changes in a way old saves can't satisfy, so
-// stale data is rejected rather than loaded into a mismatched world.
-const SAVE_VERSION = 1;
+// stale data is rejected rather than loaded into a mismatched world. v2 added
+// the terrain seed.
+const SAVE_VERSION = 2;
 
 export class World {
   // `seed: false` builds an empty world (no starting food/creatures, rng
@@ -38,25 +40,64 @@ export class World {
     this.kills = 0;
     this.peakPopulation = 0;
 
+    // The terrain map. A seeded world grows its own in `seed()`; an unseeded one
+    // (about to be loaded, or used empty in tests) gets a default map so lookups
+    // never hit null, which `deserialize` then replaces with the saved seed's.
+    this.terrainSeed = 0;
+    this.terrain = new Terrain(this.width, this.height, this.terrainSeed);
+
     if (seed) this.seed();
   }
 
   seed() {
-    for (let i = 0; i < CONFIG.food.startCount; i++) this.spawnFood();
+    // Grow the terrain from a seed drawn off the main rng, so each fresh world
+    // gets a different map. Terrain generation uses its own internal rng, so it
+    // never perturbs the main simulation stream.
+    this.terrainSeed = (this.rng() * 0x100000000) >>> 0;
+    this.terrain = new Terrain(this.width, this.height, this.terrainSeed);
+
+    // Seed the starting larder. Because spawnFood now turns down infertile
+    // ground (and water outright), keep trying until the world is stocked to
+    // startCount, with a generous guard so a pathological map can't loop forever.
+    let guard = 0;
+    while (this.food.length < CONFIG.food.startCount && guard < CONFIG.food.startCount * 50) {
+      this.spawnFood();
+      guard++;
+    }
     for (let i = 0; i < CONFIG.creature.startCount; i++) {
       this.creatures.push(Creature.random(this, this.rng));
     }
     this.peakPopulation = this.creatures.length;
   }
 
-  // Add a food pellet, at (x, y) if given or a random spot otherwise. Returns
-  // the pellet, or null if the world is already at its food carrying capacity.
+  // Add a food pellet and return it, or null if the world is at its food
+  // carrying capacity (or — for a random spawn — no fertile ground turned up).
+  //
+  // An explicit (x, y) is placed verbatim: the food brush plants exactly where
+  // asked, terrain or not. A random spawn instead samples the terrain — it makes
+  // a few attempts, keeping the first spot whose tile fertility wins a roll, so
+  // plants cluster on fertile soil and never sprout on water.
   spawnFood(x, y) {
     if (this.food.length >= CONFIG.food.maxCount) return null;
-    const f = {
-      x: x ?? this.rng.range(0, this.width),
-      y: y ?? this.rng.range(0, this.height),
-    };
+
+    let fx = x;
+    let fy = y;
+    if (fx === undefined) {
+      let found = false;
+      for (let i = 0; i < CONFIG.terrain.foodAttempts; i++) {
+        const px = this.rng.range(0, this.width);
+        const py = this.rng.range(0, this.height);
+        if (this.rng.chance(this.terrain.fertilityAt(px, py))) {
+          fx = px;
+          fy = py;
+          found = true;
+          break;
+        }
+      }
+      if (!found) return null;
+    }
+
+    const f = { x: fx, y: fy };
     this.food.push(f);
     return f;
   }
@@ -243,6 +284,7 @@ export class World {
       kills: this.kills,
       peakPopulation: this.peakPopulation,
       foodSpawnAccumulator: this.foodSpawnAccumulator,
+      terrainSeed: this.terrainSeed,
       rngState: this.rng.getState(),
       food: this.food.filter((f) => !f.dead).map((f) => [f.x, f.y]),
       creatures: this.creatures.filter((c) => c.alive).map((c) => c.serialize()),
@@ -264,6 +306,11 @@ export class World {
     world.kills = data.kills;
     world.peakPopulation = data.peakPopulation;
     world.foodSpawnAccumulator = data.foodSpawnAccumulator;
+
+    // Regrow the exact same terrain from its saved seed (the map itself isn't
+    // stored — the seed reproduces it bit-for-bit).
+    world.terrainSeed = data.terrainSeed >>> 0;
+    world.terrain = new Terrain(world.width, world.height, world.terrainSeed);
 
     world.food = data.food.map(([x, y]) => ({ x, y }));
 
