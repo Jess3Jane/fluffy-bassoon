@@ -8,6 +8,7 @@ import { History } from "./history.js";
 import { Charts } from "./charts.js";
 import { saveWorld, loadWorld, hasSavedWorld } from "./persistence.js";
 import { ToolController, TOOLS, TOOL_LABELS } from "./tools.js";
+import { phaseLabel } from "./daycycle.js";
 
 const FIXED_DT = 1 / 60; // simulation step, seconds
 const MAX_FRAME = 0.1; // clamp huge gaps (e.g. tab was backgrounded)
@@ -90,6 +91,7 @@ function updateHud() {
     row("Food", s.food),
     row("Top gen", s.generation),
     row("Time", formatTime(s.time)),
+    row("Daylight", `${phaseLabel(s.time)} ${Math.round(s.daylight * 100)}%`),
     row("Avg energy", s.avgEnergy.toFixed(0)),
     row("Kills", s.kills),
     divider(),

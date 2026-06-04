@@ -17,6 +17,11 @@ Specialising at either end is more efficient than sitting in the middle, so a
 **second trophic level** emerges on its own — and the carnivore share rises and
 falls with the supply of prey.
 
+A **day-night cycle** rides over all of it: daylight rises and falls on a fixed
+rhythm, and food regrows fast in the light but slowly in the dark. The larder —
+and the population that lives off it — breathes with the cycle, and the world
+visibly dims at night.
+
 ## Run it
 
 It's a static site with no build step. Either open `index.html` through a local
@@ -46,6 +51,7 @@ Or just use the deployed GitHub Pages site.
   hue that descends with a slight drift, so clades show up as distinct colour
   bands and you can watch a lineage spread or wink out.
 - The HUD shows live population, carnivore count, food, kills, top generation,
+  the current time of day (Day / Dusk / Night / Dawn with a daylight percentage),
   and average traits (including diet).
 - Two **history charts** in the HUD trace the world over time: a population
   panel (total population with the carnivore sub-band) and an average-trait

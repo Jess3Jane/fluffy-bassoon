@@ -70,12 +70,22 @@ population dynamics, natural selection, and surprising behaviour.
       a point via `Creature.randomAt` and keeps the peak counter honest), so the
       brush logic stays a thin DOM shim and the spawning is headlessly tested.
 
+- [x] Day-night cycle affecting food growth. A raised-cosine *daylight* level
+      (`src/daycycle.js`) rides a fixed sim-time period — full at noon, dark at
+      midnight, with smooth dawn/dusk shoulders — and scales the food spawn rate
+      between full and a configurable night floor (`CONFIG.dayNight`). Plants
+      regrow fast by day and slowly by night, so the larder (and the population
+      living off it) breathes with the cycle instead of holding steady. The whole
+      cycle is a *pure function of `world.time`*, so it adds no serialized state,
+      stays bit-identical across save/load, and reads the same at any speed. The
+      renderer washes the scene with a deepening night veil, and the HUD shows the
+      phase (Day / Dusk / Night / Dawn) and daylight percentage.
+
 ## Next up
 
-- [ ] Day-night cycle affecting food growth.
+- [ ] Terrain (water, fertile, barren) influencing movement and food.
 
 ## Ideas / someday
 
-- Terrain (water, fertile, barren) influencing movement and food.
 - Simple neural-net brains instead of hand-tuned genome weights.
 - Sexual reproduction with genome crossover.
