@@ -78,6 +78,15 @@ export const CONFIG = {
     // The combined season × weather multiplier never drops below this, so even a
     // winter drought only slows the larder rather than stopping it dead.
     foodFloor: 0.05,
+
+    // Behavioural reach: beyond the larder, a spell shapes how creatures move
+    // and sense. Only the *wet* side of the weather signal bites here — rain and
+    // storms — so a rain spell is a double-edged gift: it grows more food but
+    // makes that food harder to find and a steady course harder to hold, while a
+    // drought leaves clear, calm air (you see far and steer true, but go hungry).
+    senseFloor: 0.45, // sense range in the heaviest downpour, as a fraction of clear
+    windOnset: 0.15, // rain milder than this is calm; gusts build past it into storms
+    windBuffet: 2.6, // peak heading jitter (radians/sec, std-dev) in a full storm
   },
 
   // Terrain: a static, seed-generated map of tiles under the world. Most of it

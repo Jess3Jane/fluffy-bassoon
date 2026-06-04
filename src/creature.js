@@ -7,6 +7,7 @@
 import { CONFIG } from "./config.js";
 import { randomGenome, mutate, genomeHue } from "./genome.js";
 import { wrapDelta } from "./math.js";
+import { weatherSenseFactor, windStrength } from "./weather.js";
 
 let NEXT_ID = 1;
 
@@ -111,9 +112,12 @@ export class Creature {
 
     // --- Sense: look for the food source that best matches our diet. A
     // herbivore-leaning creature still benefits from plants; a carnivore-leaning
-    // one hunts prey it can overpower. Carry the chosen target's position. ---
-    const plant = g.diet < 1 ? world.nearestFood(this.x, this.y, g.sense) : null;
-    const prey = wantsMeat ? world.nearestPrey(this, g.sense) : null;
+    // one hunts prey it can overpower. Rain dims sight, so the reach shrinks in a
+    // downpour — food that grows in the wet is harder to actually find. Carry the
+    // chosen target's position. ---
+    const sense = g.sense * weatherSenseFactor(world.time);
+    const plant = g.diet < 1 ? world.nearestFood(this.x, this.y, sense) : null;
+    const prey = wantsMeat ? world.nearestPrey(this, sense) : null;
     let target = null;
     if (prey && plant) target = g.diet >= 0.5 ? prey : plant;
     else target = prey || plant;
@@ -135,6 +139,15 @@ export class Creature {
     turn = Math.max(-maxTurn, Math.min(maxTurn, turn));
     // Wanderers don't commit fully even when they see food.
     this.heading += turn * (target ? 1 : 1 - 0.3 * g.wander);
+
+    // --- Storm buffeting: gusts knock the heading around in a storm, so even a
+    // creature locked onto food gets jostled off its line. The kick scales with
+    // the wind, so it's nothing in fair weather and fiercest at a storm's peak.
+    // (Drought is calm: its dry air leaves both sight and steering untouched.) ---
+    const wind = windStrength(world.time);
+    if (wind > 0) {
+      this.heading += rng.normal() * wind * CONFIG.weather.windBuffet * dt;
+    }
 
     // --- Move. Terrain underfoot scales travel: open ground is free, but water
     // bogs a creature down, so it crawls across (and burns base metabolism the

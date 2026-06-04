@@ -96,6 +96,40 @@ export function weatherLabel(time) {
   return "Clear";
 }
 
+// --- Behavioural effects -------------------------------------------------
+//
+// Weather reaches past the larder into how creatures move and sense. Only the
+// *wet* half of the signal bites: rain and storms. Drought is the dry, still
+// opposite — clear air to see through and calm air to steer in — so the two
+// extremes trade off against each other (rain feeds the world but fogs and
+// jostles it; drought starves it but leaves it legible). Both stay pure
+// functions of sim-time, so they add no serialized state and replay identically.
+
+// How wet it is right now, in [0, 1]: the positive (rain) side of the weather
+// signal, with dry/fair weather reading as 0. The behavioural effects below all
+// scale off this.
+function wetness(time) {
+  return Math.max(0, weatherNoise(time));
+}
+
+// Multiplier on a creature's sense range for the current weather, in
+// [senseFloor, 1]. Clear and dry air sees the full distance (1); rain dims sight
+// toward `senseFloor` at the height of a downpour, so food and prey are harder
+// to spot through the rain even as the rain grows more of it.
+export function weatherSenseFactor(time) {
+  return 1 - (1 - CONFIG.weather.senseFloor) * wetness(time);
+}
+
+// Storm wind strength in [0, 1]: zero in calm, dry, or only-lightly-wet weather,
+// then ramping up once the rain passes `windOnset` and building to a full gale
+// at the peak of a storm. Drives the heading buffeting a creature feels.
+export function windStrength(time) {
+  const onset = CONFIG.weather.windOnset;
+  const wet = wetness(time);
+  if (wet <= onset) return 0;
+  return (wet - onset) / (1 - onset);
+}
+
 // --- Combined ------------------------------------------------------------
 
 // The combined season × weather multiplier on food growth, floored so it never
