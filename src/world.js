@@ -181,6 +181,26 @@ export class World {
     return best;
   }
 
+  // Local prey crowd around `victim`, squashed to [0, 1] — the "safety in
+  // numbers" read behind predation dilution. Counts the *other* live creatures
+  // this `predator` could also eat (the confusion set: alternative targets it
+  // might mistake the victim for) within `radius` of the victim, excluding the
+  // victim and the predator itself, saturated against `dilutionNorm`. The catch
+  // chance in `Creature.update` falls with this, so a victim buried in a herd is
+  // harder to single out than a lone one. Uses the same creature grid and the
+  // same `canEat` rule as the predation queries.
+  preyDensity(predator, victim, radius) {
+    const r2 = radius * radius;
+    let crowd = 0;
+    this.creatureGrid.forEachNear(victim.x, victim.y, radius, (c) => {
+      if (c === victim || c === predator || !c.alive || !predator.canEat(c)) return;
+      const d = wrapDistSq(victim.x, victim.y, c.x, c.y, this.width, this.height);
+      if (d > r2) return;
+      crowd++;
+    });
+    return Math.min(1, crowd / CONFIG.creature.dilutionNorm);
+  }
+
   // Local kin density around `self` within `radius`, squashed to [0, 1]. Each
   // live neighbour contributes its lineage-hue similarity to `self` (1 for a
   // clone, fading to 0 for a stranger past `kinTolerance`), and the sum is

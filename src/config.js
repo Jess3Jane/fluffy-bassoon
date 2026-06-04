@@ -45,6 +45,21 @@ export const CONFIG = {
     // plus a bonus for its body mass, all scaled by the predator's diet.
     meatEnergyEff: 0.6,
     meatBodyEnergy: 5,
+
+    // Safety in numbers. A victim packed among other prey is harder to single
+    // out — the strike is diluted and the predator confused by the press of
+    // similar bodies. When a predator has a victim in reach, the catch is rolled
+    // against a chance that falls with the local prey crowd (the other creatures
+    // this predator could eat, within `dilutionRadius` of the victim, read off
+    // the creature grid like `kinDensity`). The crowd's effect saturates at
+    // `dilutionNorm` neighbours and cuts the catch chance by at most
+    // `dilutionStrength` — kept below 1 so even a dense herd leaves a catch floor
+    // (a herd is a refuge, not a fortress: predators must work to cut an animal
+    // out of one, but a stable herd can never starve its hunters into collapse).
+    // This gives flocking an emergent anti-predator payoff beyond scent.
+    dilutionRadius: 50, // how close other prey must be to the victim to shield it
+    dilutionNorm: 4, // nearby-prey count at which the dilution effect saturates
+    dilutionStrength: 0.7, // max cut to catch chance in a full crowd (<1 = floor)
   },
 
   // Day-night cycle: a raised-cosine daylight level on a fixed sim-time period

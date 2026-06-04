@@ -232,23 +232,36 @@ export class Creature {
     if (wantsMeat) {
       const victim = world.preyInReach(this);
       if (victim) {
-        victim.alive = false;
-        world.kills++;
-        this.gain(
-          g.diet * (victim.energy * c.meatEnergyEff + victim.radius * c.meatBodyEnergy),
-        );
-        // A kill spills a strong "danger" plume where the prey fell — blood on
-        // the wind that sends other prey fleeing and draws other predators in.
-        // The blood carries the victim's lineage hue, so its own kin read the
-        // warning loudest (their alarm response, weighted by their kinship gene,
-        // keys off how close the dead one's hue is to theirs).
-        world.scent.emit(
-          victim.x,
-          victim.y,
-          SCENT.DANGER,
-          CONFIG.scent.dangerStrength,
-          victim.lineageHue,
-        );
+        // Safety in numbers: a victim packed among other prey is harder to single
+        // out — the strike is diluted and the eye confused by the press of similar
+        // bodies. Roll the catch against a chance that falls with the local prey
+        // crowd (read off the creature grid like kinDensity), down to a floor so a
+        // herd is a refuge, not a fortress. A lone victim (crowd 0 → chance 1) is
+        // caught outright and draws no rng, so a solitary hunt is unchanged. The
+        // roll is on the main rng, so it replays bit-identically across save/load.
+        const crowd = world.preyDensity(this, victim, c.dilutionRadius);
+        const catchChance = 1 - c.dilutionStrength * crowd;
+        if (catchChance < 1 && !rng.chance(catchChance)) {
+          // The victim slips away in the confusion of the crowd; no kill this step.
+        } else {
+          victim.alive = false;
+          world.kills++;
+          this.gain(
+            g.diet * (victim.energy * c.meatEnergyEff + victim.radius * c.meatBodyEnergy),
+          );
+          // A kill spills a strong "danger" plume where the prey fell — blood on
+          // the wind that sends other prey fleeing and draws other predators in.
+          // The blood carries the victim's lineage hue, so its own kin read the
+          // warning loudest (their alarm response, weighted by their kinship gene,
+          // keys off how close the dead one's hue is to theirs).
+          world.scent.emit(
+            victim.x,
+            victim.y,
+            SCENT.DANGER,
+            CONFIG.scent.dangerStrength,
+            victim.lineageHue,
+          );
+        }
       }
     }
 

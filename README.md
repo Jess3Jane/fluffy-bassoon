@@ -84,6 +84,16 @@ free (too faint a call is never laid, so it costs no energy), so advertising is
 paid for only when kin are there to repay it — which lets `foodVoice` and
 `kinship` co-evolve instead of leaving all the work to the listener.
 
+Clustering now pays off in **safety in numbers**, too. A predator that has a
+victim in reach no longer makes a sure kill: the strike is *diluted* by the crowd
+of other prey pressed around its target, so a grazer buried in a herd is harder
+to single out than a lone one. The catch chance falls with the local prey density
+(read off the creature grid, just like the kin headcount) down to a floor — never
+to zero, so a herd is a refuge, not a fortress, and predators must work to cut an
+animal out of one rather than starving against an uncatchable flock. That gives
+flocking an emergent anti-predator value on top of the scent payoff, a second
+reason for the population to bunch up.
+
 ## Run it
 
 It's a static site with no build step. Either open `index.html` through a local
