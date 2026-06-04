@@ -6,7 +6,12 @@
 import { CONFIG } from "./config.js";
 import { Creature, reserveIds } from "./creature.js";
 import { SpatialGrid } from "./grid.js";
-import { GENES, hueSimilarity, countHueClusters } from "./genome.js";
+import {
+  GENES,
+  hueSimilarity,
+  countHueClusters,
+  countGeneClusters,
+} from "./genome.js";
 import { wrapDistSq } from "./math.js";
 import { daylight, foodGrowthFactor } from "./daycycle.js";
 import {
@@ -431,6 +436,7 @@ export class World {
     let energy = 0;
     let carnivores = 0;
     const hues = []; // lineage hues, clustered below into a species count
+    const genomes = []; // adaptive genomes, clustered into an ecological count
     for (const c of this.creatures) {
       avg.speed += c.genome.speed;
       avg.sense += c.genome.sense;
@@ -448,6 +454,7 @@ export class World {
       if (c.genome.diet > CONFIG.creature.carnivoreThreshold) carnivores++;
       if (c.generation > maxGen) maxGen = c.generation;
       hues.push(c.lineageHue);
+      genomes.push(c.genome);
     }
     if (n > 0) {
       for (const k of Object.keys(avg)) avg[k] /= n;
@@ -463,6 +470,17 @@ export class World {
     let cross = 0;
     for (const v of this.matingRing) cross += v;
     const isolation = matings > 0 ? 1 - cross / matings : null;
+    // Ecological species: cluster the live population on its *adaptive* genome
+    // (the multi-D mirror of the hue count). O(n²), so it's skipped above a
+    // population guard and reported as null there rather than stalling the loop.
+    const geneSpecies =
+      n > 0 && n <= CONFIG.speciation.maxClusterPop
+        ? countGeneClusters(
+            genomes,
+            CONFIG.speciation.geneTolerance,
+            CONFIG.speciation.minClusterSize,
+          )
+        : null;
     return {
       population: n,
       food: this.food.length,
@@ -484,6 +502,7 @@ export class World {
         CONFIG.scent.kinTolerance,
         CONFIG.speciation.minClusterSize,
       ),
+      geneSpecies,
       matings,
       crossMatings: cross,
       isolation,

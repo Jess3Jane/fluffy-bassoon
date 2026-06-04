@@ -1,9 +1,10 @@
 // Tiny sparkline charts for the HUD, drawn straight to a canvas. Four stacked
 // panels read out of a History ring: population over time (with the carnivore
 // sub-band), the average-trait drift (diet, plus speed/size normalised to their
-// gene ranges so they share a 0–1 axis), the speciation count (how many distinct
-// lineage-hue clades are large enough to count), and realised reproductive
-// isolation (the within-lineage share of recent sexual matings). Together they
+// gene ranges so they share a 0–1 axis), the speciation count (distinct
+// lineage-hue clades alongside the ecological count clustered on the adaptive
+// genome), and realised reproductive isolation (the within-lineage share of
+// recent sexual matings). Together they
 // make the emergent story legible — booms and crashes, the selection pressure
 // behind them, clades splitting apart, and breeding actually turning inward as
 // they do — without leaving the page.
@@ -61,13 +62,17 @@ export class Charts {
       { color: "#d9b25f", label: "size", values: s.map((d) => normTrait("size", d.size)) },
     ]);
 
-    // Species count: distinct lineage-hue clades, scaled to its own windowed
-    // peak so a split from one clade into two or three is visible even though
-    // the raw numbers are small.
-    const spMax = history.max("species", 1);
+    // Species count: distinct lineage-hue clades (neutral/ancestry) plus the
+    // ecological count clustered on the adaptive genome. Both share an axis
+    // scaled to whichever peaks higher, so an ecological split that outruns the
+    // colour drift — the two lines diverging — is visible even though the raw
+    // numbers are small.
+    const spMax = Math.max(history.max("species", 1), history.max("geneSpecies", 1));
     this.panel(2 * (panelH + GAP), panelH, "Species", String(spMax), [
-      { color: "#b48ef0", fill: "rgba(180,142,240,0.14)", label: "clades",
+      { color: "#b48ef0", fill: "rgba(180,142,240,0.14)", label: "hue",
         values: s.map((d) => (d.species || 0) / spMax) },
+      { color: "#e0a85f", label: "eco",
+        values: s.map((d) => (d.geneSpecies || 0) / spMax) },
     ]);
 
     // Reproductive isolation: the within-lineage share of recent sexual matings,
