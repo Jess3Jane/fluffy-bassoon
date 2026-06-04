@@ -261,21 +261,38 @@ population dynamics, natural selection, and surprising behaviour.
       gated call (kin-blind full voice, kin-loud, stranger-silent-and-free, graded
       between).
 
+- [x] Safety in numbers, so kin clustering has a survival payoff beyond
+      signalling. Kin-weighted emission already pulls relatives together around
+      food, but grouping carried no direct benefit — a predator caught a lone
+      grazer exactly as easily as one in a crowd. Now a kill is *diluted by the
+      crowd*: when a predator has a victim in reach (`Creature.update`), the catch
+      is rolled against a chance that falls with the local prey press.
+      `World.preyDensity(predator, victim, radius)` is the cheap read — it scans
+      the existing creature grid within `dilutionRadius` of the victim and counts
+      the *other* creatures this predator could eat (the confusion set of
+      alternative targets, the victim and predator themselves excluded), squashed
+      to `[0,1]` against `dilutionNorm`, the crowd size at which the effect tops
+      out. The catch chance is `1 − dilutionStrength·density`: a lone victim
+      (density 0 → chance 1) is caught outright and draws no rng, so a solitary
+      hunt is exactly as before, while a victim buried in a saturating herd is
+      caught only at the floored chance `1 − dilutionStrength`. `dilutionStrength`
+      is deliberately `< 1`, so even a dense herd leaves a real catch floor — the
+      flagged failure mode (a herd that can never be eaten, which starves its
+      predators and then itself) can't take hold: a kill is made *harder* in a
+      crowd, never *unwinnable*. This gives flocking an emergent anti-predator
+      payoff — a second reason (besides scent) for the population to aggregate, so
+      herds can form for defence and predators must work to cut an animal out of
+      one. The catch roll is on the main rng, so a restored world replays
+      bit-identically (the persistence round-trip covers it; `preyDensity` and the
+      gated catch get their own `test/safety.test.mjs` — the saturating, canEat-
+      filtered, radius-bounded crowd read, the always-caught lone victim, the
+      floored crowded kill rate, and the monotone fall between).
+
 ## Next up
 
-- [ ] Safety in numbers, so kin clustering has a survival payoff beyond
-      signalling. Kin-weighted emission now pulls relatives together around food,
-      but grouping carries no direct benefit yet — a predator catches a lone
-      grazer exactly as easily as one in a crowd. Add a dilution / confusion
-      effect: a prey creature's chance of actually being caught in `preyInReach`
-      (or the energy a predator extracts) drops with how many other prey are
-      packed around the victim, read off the creature grid like `kinDensity`. That
-      gives flocking an emergent anti-predator value, so herds can form for
-      defence and predators must work to cut an animal out of one — a second
-      reason (besides scent payoff) for the population to aggregate. Watch the
-      knobs so it doesn't make predation impossible (a stable herd that can never
-      be eaten starves its predators and then itself); the dilution should make a
-      kill *harder*, not *unwinnable*.
+- [ ] Figure out the logical next step (see Ideas / someday below for seeds —
+      neural-net brains or sexual reproduction with crossover are the two big
+      ones), or break one of those into smaller tasks.
 
 ## Ideas / someday
 
