@@ -38,6 +38,7 @@ export class History {
       isolation: stats.isolation,
       food: stats.food,
       diet: stats.avg.diet,
+      forage: stats.avg.forage,
       speed: stats.avg.speed,
       size: stats.avg.size,
       sense: stats.avg.sense,

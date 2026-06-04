@@ -130,7 +130,9 @@ export class Creature {
     // downpour — food that grows in the wet is harder to actually find. Carry the
     // chosen target's position. ---
     const sense = g.sense * weatherSenseFactor(world.time);
-    const plant = g.diet < 1 ? world.nearestFood(this.x, this.y, sense) : null;
+    // Seek only plants this creature's `forage` specialism can use, so a
+    // specialist homes in on its own kind's patches and ignores the other's.
+    const plant = g.diet < 1 ? world.nearestFood(this.x, this.y, sense, g.forage) : null;
     const prey = wantsMeat ? world.nearestPrey(this, sense) : null;
     let target = null;
     if (prey && plant) target = g.diet >= 0.5 ? prey : plant;
@@ -204,9 +206,15 @@ export class Creature {
     // we are, so committing to meat means getting little from greens. ---
     if (g.diet < 1) {
       const reach = this.radius + CONFIG.food.radius;
-      const eaten = world.consumeFoodNear(this.x, this.y, reach);
-      if (eaten > 0) {
-        this.gain(eaten * CONFIG.food.energy * (1 - g.diet));
+      // Yield scales not just with how herbivorous we are, but with how well our
+      // `forage` specialism matches each plant's kind: a matched specialist gets
+      // full value, a generalist a discount, and an off-kind plant nothing at all
+      // (it's left uneaten by forageNear). So committing to one sub-resource pays
+      // a clade that splits onto it, the disruptive-selection payoff behind niche
+      // partitioning.
+      const { count, gained } = world.forageNear(this.x, this.y, reach, g.forage);
+      if (count > 0) {
+        this.gain(gained * CONFIG.food.energy * (1 - g.diet));
         // Leave a "food here" plume on the air for others to follow — but only as
         // loudly as the `foodVoice` gene dictates, and at an energy price. A
         // silent grazer keeps its larder secret for free; a loud one pays to

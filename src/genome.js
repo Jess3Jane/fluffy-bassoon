@@ -14,6 +14,17 @@ export const GENES = {
   metabolismEff: [0.7, 1.3], // efficiency multiplier on living cost
   diet: [0.0, 1.0], // 0 = pure herbivore (plants), 1 = pure carnivore (prey)
 
+  // Foraging specialism along the plant-kind axis. There are two plant kinds
+  // (0 and 1); this gene sets which a herbivore is suited to eat. At 0 it
+  // specialises on kind-0 plants, at 1 on kind-1, and at 0.5 it's a generalist
+  // taking either at a discount. The yield curve is convex (`forageEff`), so two
+  // specialists beat one generalist — disruptive selection that lets a clade
+  // split onto separate sub-resources and stop competing head-to-head with its
+  // sister ecotype. Because it's a normal adaptive gene it joins `geneVector`,
+  // so a forage gap shows up in the ecological species count: the partitioning
+  // this gene enables is exactly what that readout was built to surface.
+  forage: [0.0, 1.0], // 0 = kind-0 specialist ↔ 1 = kind-1 specialist (0.5 generalist)
+
   // Scent signalling: how the creature uses the shared pheromone field. These
   // turn the plume layer from a fixed reflex into something selection acts on,
   // so honest signalling, silence, eavesdropping, and deception can all evolve.
@@ -116,6 +127,22 @@ export function crossover(a, b, rng) {
   }
   child.lineageHue = a.lineageHue;
   return child;
+}
+
+// Energy efficiency a creature with this `forage` gene extracts from a plant of
+// `kind` (0 or 1), in [0, 1]. The match between gene and kind — 1 when perfectly
+// specialised on it, 0 for the opposite specialism, 0.5 for a generalist — is
+// raised to `forageExponent` (> 1, so the curve is convex and two specialists
+// out-yield one generalist: disruptive selection). Below `forageMinEff` it
+// returns 0: the creature won't bother with — and won't consume — a plant too
+// far off its specialism, so each ecotype leaves the other's resource untouched
+// (clean niche partitioning). This is the single source of truth for both
+// *whether* a creature forages a kind (yield > 0) and *how much* it gains, used
+// by the food-targeting sense and the eating step alike.
+export function forageYield(forage, kind) {
+  const match = kind === 1 ? forage : 1 - forage;
+  const eff = Math.pow(match, CONFIG.food.forageExponent);
+  return eff >= CONFIG.food.forageMinEff ? eff : 0;
 }
 
 // Map a genome to a hue so a creature's trophic role is visible at a glance:

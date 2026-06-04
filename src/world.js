@@ -11,6 +11,7 @@ import {
   hueSimilarity,
   countHueClusters,
   countGeneClusters,
+  forageYield,
 } from "./genome.js";
 import { wrapDistSq } from "./math.js";
 import { daylight, foodGrowthFactor } from "./daycycle.js";
@@ -37,11 +38,14 @@ const MAX_CREATURE_RADIUS = CONFIG.creature.radius * GENES.size[1];
 // for sexual reproduction (a pre-v6 genome lacks it, so its reproduction mode
 // would be undefined — better to reject the save than breed off a NaN); v7
 // added the `mateChoice` gene for assortative/disassortative mate choice (a
-// pre-v7 genome lacks it, so its preference would be undefined). The mating-
-// isolation ring added later is *not* a version bump: it's pure readout state an
-// older save can satisfy by simply loading empty, so it degrades gracefully
-// rather than rejecting the save (see `deserialize`).
-const SAVE_VERSION = 7;
+// pre-v7 genome lacks it, so its preference would be undefined). v8 added the
+// `forage` gene for plant-kind specialism *and* a per-pellet `kind` (a pre-v8
+// genome lacks forage, so its foraging would be undefined, and a pre-v8 pellet
+// carries no kind, so its yield would be undefined). The mating-isolation ring
+// added later is *not* a version bump: it's pure readout state an older save can
+// satisfy by simply loading empty, so it degrades gracefully rather than
+// rejecting the save (see `deserialize`).
+const SAVE_VERSION = 8;
 
 export class World {
   // `seed: false` builds an empty world (no starting food/creatures, rng
@@ -136,7 +140,11 @@ export class World {
       if (!found) return null;
     }
 
-    const f = { x: fx, y: fy };
+    // A pellet's plant kind is a pure function of where it sprouts, so the two
+    // species grow in distinct patches of the map (a spatial niche axis) and —
+    // crucially — assigning it draws no rng, so adding plant kinds leaves the
+    // deterministic stream byte-identical to before.
+    const f = { x: fx, y: fy, kind: plantKindAt(fx, fy) };
     this.food.push(f);
     return f;
   }
@@ -153,12 +161,18 @@ export class World {
     return c;
   }
 
-  // Nearest food to a point within `radius`, or null. Uses the food grid.
-  nearestFood(x, y, radius) {
+  // Nearest food to a point within `radius`, or null. Uses the food grid. When a
+  // `forage` gene is supplied, only plants this forager would actually eat are
+  // eligible — a specialist seeks its own kind and ignores the other's patches,
+  // so the spatial niches the plant kinds carve out steer who forages where.
+  // Omitting `forage` (as the spatial-grid self-test does) treats every kind as
+  // eligible, the original "nearest plant of any kind" behaviour.
+  nearestFood(x, y, radius, forage) {
     let best = null;
     let bestD = radius * radius;
     this.foodGrid.forEachNear(x, y, radius, (f) => {
       if (f.dead) return;
+      if (forage !== undefined && forageYield(forage, f.kind) <= 0) return;
       const d = wrapDistSq(x, y, f.x, f.y, this.width, this.height);
       if (d < bestD) {
         bestD = d;
@@ -301,22 +315,31 @@ export class World {
     }
   }
 
-  // Mark food within `radius` of a point as eaten and return the count. The
-  // food is flagged rather than spliced out immediately so the grid we're
-  // iterating stays stable; eaten food is skipped by subsequent queries this
-  // step and compacted out at the end of `update`.
-  consumeFoodNear(x, y, radius) {
+  // Forage the plants within `radius` of a point for a creature with this
+  // `forage` gene, returning `{ count, gained }` — how many pellets it ate and
+  // the efficiency-weighted yield (Σ `forageYield`) to convert into energy. Only
+  // plants the forager actually benefits from are consumed: a kind it can't use
+  // (yield 0, below the specialism floor) is left where it grows for the other
+  // ecotype, which is what turns the plant kinds into genuinely partitioned
+  // resources rather than a shared larder everyone strips. Eaten food is flagged
+  // rather than spliced out immediately so the grid we're iterating stays stable;
+  // it's skipped by subsequent queries this step and compacted out at end of
+  // `update`.
+  forageNear(x, y, radius, forage) {
     const r2 = radius * radius;
-    let eaten = 0;
+    let count = 0;
+    let gained = 0;
     this.foodGrid.forEachNear(x, y, radius, (f) => {
       if (f.dead) return;
       const d = wrapDistSq(x, y, f.x, f.y, this.width, this.height);
-      if (d <= r2) {
-        f.dead = true;
-        eaten++;
-      }
+      if (d > r2) return;
+      const yield_ = forageYield(forage, f.kind);
+      if (yield_ <= 0) return; // off-resource: leave it for the other ecotype
+      f.dead = true;
+      count++;
+      gained += yield_;
     });
-    return eaten;
+    return { count, gained };
   }
 
   update(dt) {
@@ -400,7 +423,7 @@ export class World {
     }
     this.creatures = living.concat(newborns);
 
-    // Drop food eaten this step (flagged by consumeFoodNear).
+    // Drop food eaten this step (flagged by forageNear).
     let eaten = false;
     for (const f of this.food) {
       if (f.dead) {
@@ -424,6 +447,7 @@ export class World {
       size: 0,
       wander: 0,
       diet: 0,
+      forage: 0,
       foodVoice: 0,
       alarmVoice: 0,
       foodTrust: 0,
@@ -443,6 +467,7 @@ export class World {
       avg.size += c.genome.size;
       avg.wander += c.genome.wander;
       avg.diet += c.genome.diet;
+      avg.forage += c.genome.forage;
       avg.foodVoice += c.genome.foodVoice;
       avg.alarmVoice += c.genome.alarmVoice;
       avg.foodTrust += c.genome.foodTrust;
@@ -481,9 +506,15 @@ export class World {
             CONFIG.speciation.minClusterSize,
           )
         : null;
+    // Tally the standing larder by plant kind, so the HUD can show how the two
+    // sub-resources stock up — an unexploited kind piling up is the open niche
+    // pulling a forager clade toward it.
+    const foodByKind = [0, 0];
+    for (const f of this.food) foodByKind[f.kind === 1 ? 1 : 0]++;
     return {
       population: n,
       food: this.food.length,
+      foodByKind,
       scent: this.scent.plumes.length,
       time: this.time,
       daylight: daylight(this.time),
@@ -528,7 +559,7 @@ export class World {
       foodSpawnAccumulator: this.foodSpawnAccumulator,
       terrainSeed: this.terrainSeed,
       rngState: this.rng.getState(),
-      food: this.food.filter((f) => !f.dead).map((f) => [f.x, f.y]),
+      food: this.food.filter((f) => !f.dead).map((f) => [f.x, f.y, f.kind]),
       creatures: this.creatures.filter((c) => c.alive).map((c) => c.serialize()),
       scent: this.scent.serialize(),
       matingRing: this.matingRing.slice(),
@@ -556,7 +587,7 @@ export class World {
     world.terrainSeed = data.terrainSeed >>> 0;
     world.terrain = new Terrain(world.width, world.height, world.terrainSeed);
 
-    world.food = data.food.map(([x, y]) => ({ x, y }));
+    world.food = data.food.map(([x, y, kind]) => ({ x, y, kind: kind === 1 ? 1 : 0 }));
     world.scent = ScentField.deserialize(data.scent, world.width, world.height);
     // The isolation window is pure readout state, so an older save that predates
     // it loads with an empty ring (the read just refills as breeding resumes)
@@ -578,4 +609,14 @@ export class World {
 // Wrap a coordinate into [0, size) on a toroidal axis.
 function wrap(v, size) {
   return ((v % size) + size) % size;
+}
+
+// Which of the two plant kinds (0 or 1) sprouts at a point. Two offset sine
+// bands carve the world into smooth ~quarter-size patches of each kind, so the
+// species grow in distinct regions — a spatial sub-resource axis a forager clade
+// can specialise on and follow into its own patches. A pure function of position
+// (drawing no rng), so it's both deterministic across save/load and free of any
+// perturbation to the simulation's random stream. The split is ~50/50 by area.
+function plantKindAt(x, y) {
+  return Math.sin(x * 0.012) + Math.sin(y * 0.016) > 0 ? 1 : 0;
 }

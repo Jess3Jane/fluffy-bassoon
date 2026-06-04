@@ -16,6 +16,10 @@ const TILE_COLORS = [
   "#332b1d", // barren — dry brown
 ];
 
+// Fill colours per plant kind: kind 0 a leafy green, kind 1 a violet, so the two
+// sub-resources creatures partition along read apart at a glance.
+const FOOD_COLORS = ["#3f7d52", "#7d6fb0"];
+
 export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -76,12 +80,18 @@ export class Renderer {
     // the wind carries becomes visible, fading with each plume's strength.
     this.drawScent(ctx, world.scent);
 
-    // Food.
-    ctx.fillStyle = "#3f7d52";
-    for (const f of world.food) {
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, CONFIG.food.radius, 0, Math.PI * 2);
-      ctx.fill();
+    // Food. The two plant kinds draw in distinct hues — leafy green for kind 0,
+    // violet for kind 1 — so the spatial patchwork the resource axis partitions
+    // along is visible at a glance, and which kind a clade has settled onto reads
+    // straight off where it forages. One pass per kind keeps the fill set cheap.
+    for (let kind = 0; kind < FOOD_COLORS.length; kind++) {
+      ctx.fillStyle = FOOD_COLORS[kind];
+      for (const f of world.food) {
+        if ((f.kind === 1 ? 1 : 0) !== kind) continue;
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, CONFIG.food.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     // Creatures.

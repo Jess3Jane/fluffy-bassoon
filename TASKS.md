@@ -483,19 +483,66 @@ population dynamics, natural selection, and surprising behaviour.
       — the hue count says 1, the gene count says 2), and the population guard
       returning null over the cap while the hue count still reports.
 
+- [x] Resource partitioning / niche specialisation, so an ecological split has an
+      ecological *consequence* — diverged ecotypes stop competing head-to-head —
+      and the `geneSpecies` count becomes something the dynamics actively drive
+      toward rather than a passive readout. There are now **two plant kinds** (0
+      and 1): a pellet's `kind` is a pure function of where it sprouts
+      (`plantKindAt` — two offset sine bands carving the world into smooth
+      ~quarter-size patches), so the species grow in distinct regions (a *spatial*
+      sub-resource axis) and — deliberately — assigning a kind draws no rng, so the
+      whole change leaves the deterministic stream byte-identical (every existing
+      replay/save test still passes untouched). A new heritable gene `forage`
+      (`src/genome.js`) sets which kind a herbivore is suited to: 0 specialises on
+      kind 0, 1 on kind 1, 0.5 is a generalist taking either. `forageYield(forage,
+      kind)` is the single source of truth — `match^forageExponent` where `match`
+      is how well the gene aligns with the kind (1 perfectly specialised, 0 the
+      opposite, 0.5 generalist), returning 0 below `forageMinEff`. The exponent
+      (1.4, > 1) makes the curve **convex**, so two specialists out-yield one
+      generalist — the disruptive-selection pressure; the floor means a creature
+      *won't consume* a plant too far off its specialism, so each ecotype leaves
+      the other's resource untouched (clean partitioning, not interference
+      competition that strips the shared larder). The band of `forage` values
+      clearing the floor on both kinds is the generalist niche; outside it a
+      creature forages one kind only. The gene drives both behaviour and yield:
+      `World.nearestFood` takes a `forage` arg and a specialist *seeks* only its
+      own kind's patches (omitting it keeps the old "nearest of any kind", as the
+      grid self-test relies on), and `World.forageNear` (replacing
+      `consumeFoodNear`) consumes only the kinds the forager benefits from and
+      returns `{ count, gained }` — the efficiency-weighted yield to turn into
+      energy. Because `forage` is an ordinary adaptive gene it joins `geneVector`,
+      so a forage gap registers in the ecological species count — the partitioning
+      this gene enables is exactly what that readout was built to surface, and a
+      20-minute run shows it working: when the population drifts to one specialism
+      the *other* kind piles up unexploited, creating invasion pressure that
+      frequency-dependent selection rapidly answers (the open niche pulls `forage`
+      back within a minute), the `eco` count sitting at 2–6 coexisting ecotypes
+      while the population rides the same boom/bust band as before (a matched
+      specialist still gets full yield, so the food economy is only modestly
+      tighter — generalism is the discount, specialism the payoff). The HUD gains
+      an **Avg forage** row and splits **Food** by kind (`A/B`), the avg-traits
+      chart plots forage as a fourth line, and the renderer draws the two kinds in
+      distinct hues (green / violet) so the spatial patchwork and which kind a
+      clade has settled onto read at a glance. `SAVE_VERSION` → 8 (a pre-v8 genome
+      lacks `forage` and a pre-v8 pellet lacks `kind`, both undefined behaviour, so
+      old saves are rejected); food serializes as `[x, y, kind]`.
+      `test/forage.test.mjs` covers the yield curve (convexity, the floor, kind
+      symmetry, monotonicity), the forage-aware sense and eat (a specialist leaves
+      the off-kind plants, a generalist takes both), the stats/`foodByKind` wiring,
+      both kinds growing in a seeded world, and the kind round-tripping through
+      save/load.
+
 ## Next up
 
-- [ ] All three speciation reads are now *observations* — they measure structure
-      and behaviour but feed nothing back. The natural next step is to let an
-      ecological split have ecological *consequences*: a mechanism by which two
-      diverged ecotypes stop competing head-to-head. Consider **resource
-      partitioning / niche specialisation** — e.g. a heritable food-preference or
-      foraging gene so a clade can specialise on a sub-resource (different plant
-      kinds, or fast-vs-slow prey) and escape direct competition with its sister
-      ecotype, giving disruptive selection a concrete payoff and turning the
-      `geneSpecies` count from a passive readout into something the dynamics
-      actively drive toward. (This would likely want more than one food type —
-      currently all plants are interchangeable.) Or pick another seed below.
+- [ ] The forage split is purely *competitive* (who eats which plant); predation
+      is still a single axis (`diet` herbivore↔carnivore) with one undifferentiated
+      prey pool. A natural next step is to extend partitioning to the **second
+      trophic level** — e.g. prey-size or prey-kind preference so carnivores can
+      specialise on fast-small vs. slow-large prey and partition the predator niche
+      the way `forage` partitions the grazer niche — or to give the two plant kinds
+      *different traits* (one fast-regrowing but low-energy, one rich but sparse) so
+      the choice of which to specialise on trades off against the day-night /
+      weather rhythms rather than being a symmetric coin-flip. Or pick a seed below.
 
 ## Ideas / someday
 
