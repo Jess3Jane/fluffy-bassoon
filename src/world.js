@@ -48,12 +48,28 @@ export class World {
     this.peakPopulation = this.creatures.length;
   }
 
+  // Add a food pellet, at (x, y) if given or a random spot otherwise. Returns
+  // the pellet, or null if the world is already at its food carrying capacity.
   spawnFood(x, y) {
-    if (this.food.length >= CONFIG.food.maxCount) return;
-    this.food.push({
+    if (this.food.length >= CONFIG.food.maxCount) return null;
+    const f = {
       x: x ?? this.rng.range(0, this.width),
       y: y ?? this.rng.range(0, this.height),
-    });
+    };
+    this.food.push(f);
+    return f;
+  }
+
+  // Add a fresh, random-genome creature at (x, y) — the interactive "spawn
+  // creature" tool's entry point. Returns the new creature. There is no
+  // population cap (unlike food), so this always succeeds.
+  spawnCreature(x, y) {
+    const c = Creature.randomAt(this, x, y, this.rng);
+    this.creatures.push(c);
+    if (this.creatures.length > this.peakPopulation) {
+      this.peakPopulation = this.creatures.length;
+    }
+    return c;
   }
 
   // Nearest food to a point within `radius`, or null. Uses the food grid.
