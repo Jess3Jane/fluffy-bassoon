@@ -133,6 +133,14 @@ export const CONFIG = {
     emitCost: 0.7, // energy spent per unit of plume strength emitted
     alarmRate: 1.4, // voluntary alarm cries per second at full alarmVoice
     alarmStrength: 2.2, // strength of a voluntary alarm cry (≈ a real kill's)
+
+    // Kin recognition: every plume carries the lineage hue of the creature that
+    // laid it, and a smeller weights each plume's pull by how close that hue is
+    // to its own (scaled by its `kinship` gene). `kinTolerance` is the hue
+    // distance (degrees) at which an emitter counts as a total stranger — wide
+    // enough to span a clade (lineageHue drifts ~`mutation.lineageDrift`°/gen)
+    // but narrow enough that long-diverged lineages read as strangers.
+    kinTolerance: 40,
   },
 
   // Terrain: a static, seed-generated map of tiles under the world. Most of it

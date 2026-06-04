@@ -26,6 +26,17 @@ export const GENES = {
   alarmVoice: [0.0, 1.0], // loudness/rate of voluntary "danger" (alarm) cries
   foodTrust: [0.0, 1.0], // how strongly food scent steers this creature
   alarmTrust: [0.0, 1.0], // how strongly danger scent steers this creature
+
+  // Kin recognition: how strongly the creature filters the scent field by
+  // *who* laid each plume, told from the emitter's inherited `lineageHue`
+  // marker (close hue = close relative). At 0 the creature is kin-blind and
+  // heeds every plume by its diet/trust alone (the old behaviour); at 1 it
+  // heeds only its own kin's plumes, ignoring strangers'. This is what gives
+  // honest *food* signalling an upward path: broadcasting your larder feeds
+  // competitors, but if the creatures that answer the call are mostly close
+  // relatives (sharing your `foodVoice`), the call pays off through inclusive
+  // fitness rather than being pure altruism that erodes to silence.
+  kinship: [0.0, 1.0], // how strongly scent response is weighted toward kin
 };
 
 export function randomGenome(rng) {
@@ -78,4 +89,16 @@ function norm(name, value) {
 // Wrap a hue into [0, 360).
 function wrapHue(h) {
   return ((h % 360) + 360) % 360;
+}
+
+// Kin-similarity between two lineage hues, in [0, 1]: 1 when identical, falling
+// linearly to 0 once they are `tolerance` degrees apart on the colour wheel (a
+// stranger). Used to weight scent response toward kin. A null/undefined hue
+// (an untagged plume from an older save, or a caller that doesn't track it)
+// counts as fully similar, so kin-weighting degrades to kin-blind there.
+export function hueSimilarity(a, b, tolerance) {
+  if (a == null || b == null) return 1;
+  let d = Math.abs(((a - b) % 360) + 360) % 360;
+  if (d > 180) d = 360 - d;
+  return Math.max(0, 1 - d / tolerance);
 }

@@ -195,18 +195,55 @@ population dynamics, natural selection, and surprising behaviour.
       and the HUD shows a **signalling** block (food/alarm voice and trust), so
       the population's drift toward honesty, silence, or deception is legible.
 
+- [x] Kin recognition, so cooperation has something to select for. Honest *food*
+      signalling was pure altruism — broadcasting your larder only fed
+      competitors — so `foodVoice` had no upward pressure and would erode to
+      silence. Now every plume carries the lineage hue of whoever laid it
+      (`ScentField.emit` tags each plume; `Creature.signal` and a kill's blood
+      plume pass the emitter's / victim's `lineageHue`), and a new heritable
+      `kinship` gene (`src/genome.js`, in `[0,1]` so it mutates and clamps like
+      any other) weights a creature's scent *response* by how close the caller's
+      hue is to its own. `ScentField.steer` multiplies each plume's pull by a kin
+      weight `1 − kinship·(1 − hueSimilarity(self, plume))`: at kinship 0 the
+      creature is kin-blind and heeds every plume by diet/trust alone (the old
+      behaviour, so all prior callers and tests are unchanged), and as kinship
+      rises it discounts strangers' plumes toward zero and answers mostly its own
+      kin. `hueSimilarity` (`src/genome.js`) is a circular, tolerance-scaled
+      closeness (`scent.kinTolerance` degrees — wide enough to span a clade given
+      the ~5°/gen `lineageDrift`, narrow enough that diverged lineages read as
+      strangers); a null/untagged hue (an older save's plumes) counts as fully
+      similar, so kin recognition degrades gracefully rather than silencing the
+      field. This is the lever the signalling arena needed: a loud larder-call
+      that mainly draws relatives (who share the `foodVoice` gene) is favoured by
+      inclusive fitness where one that fed every passing competitor was not — so
+      the arena becomes a tension between kin-directed honesty and
+      stranger-directed deception, not "silence always wins". The plume hue rides
+      the save (`ScentField.serialize`/`deserialize` carry it as a 5th tuple slot;
+      `SAVE_VERSION` bumped to 5 so a pre-`kinship` genome is rejected rather than
+      loaded NaN-steered), and emission/response draw no fresh rng, so a restored
+      world replays bit-identically (a dedicated `test/kin.test.mjs` covers the
+      gene, the hue similarity, the kin-weighted steer, and the plume tagging).
+      (Exposed and fixed a latent serialize asymmetry along the way: a creature
+      killed *after* its own turn used to linger in `world.creatures` as an inert
+      corpse until the next step, which a save taken at that boundary would drop —
+      diverging the `deaths` count on resume; `World.update` now sweeps those late
+      deaths out at end of step, a change neutral to the dynamics since a dead
+      creature draws no rng and is skipped by every query.) `stats()` averages
+      `kinship` and the HUD shows a **Kinship** row.
+
 ## Next up
 
-- [ ] Kin recognition, so cooperation has something to select for. Right now
-      honest *food* signalling is pure altruism — broadcasting your larder only
-      feeds competitors — so `foodVoice` has no upward pressure and should erode
-      to silence. Give creatures a cheap way to tell kin from strangers (the
-      neutral `lineageHue` marker is already inherited and drifts per
-      generation, so a creature could weight its signals — or its trust — by hue
-      similarity to those nearby), so a loud larder-call that mostly helps close
-      relatives can pay off through inclusive fitness. That turns the signalling
-      arena from "silence always wins" into a tension between kin-directed
-      honesty and stranger-directed deception.
+- [ ] Kin-weighted *emission*, the other half of the lever. Response-side kin
+      recognition (above) lets a creature choose *whom to heed*, but a loud
+      caller still pays the full energy cost of advertising to everyone within
+      earshot, kin or not. Let a creature also modulate *how loudly* it calls by
+      how many close kin are nearby (a cheap kin-density read off the creature
+      grid + `lineageHue`), so it can stay quiet among strangers and call up when
+      relatives are around to benefit — sharpening the inclusive-fitness payoff
+      and making `foodVoice` and `kinship` co-evolve rather than only the latter
+      doing the filtering. Watch for the failure mode where this just collapses to
+      silence everywhere; if so, the kin-density read may need to *raise* the call
+      rather than gate it.
 
 ## Ideas / someday
 

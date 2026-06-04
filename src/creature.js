@@ -98,7 +98,9 @@ export class Creature {
   // gene tuned near-silent ends up effectively, and freely, mute).
   signal(world, kind, strength) {
     if (strength <= CONFIG.scent.minStrength) return;
-    world.scent.emit(this.x, this.y, kind, strength);
+    // Tag the plume with our lineage hue so kin can tell our call from a
+    // stranger's and weight their response to it accordingly.
+    world.scent.emit(this.x, this.y, kind, strength, this.lineageHue);
     this.energy -= CONFIG.scent.emitCost * strength;
   }
 
@@ -180,6 +182,8 @@ export class Creature {
       g.sense,
       g.foodTrust,
       g.alarmTrust,
+      this.lineageHue,
+      g.kinship,
     );
     if (steer.dx !== 0 || steer.dy !== 0) {
       const desiredScent = Math.atan2(steer.dy, steer.dx);
@@ -223,7 +227,16 @@ export class Creature {
         );
         // A kill spills a strong "danger" plume where the prey fell — blood on
         // the wind that sends other prey fleeing and draws other predators in.
-        world.scent.emit(victim.x, victim.y, SCENT.DANGER, CONFIG.scent.dangerStrength);
+        // The blood carries the victim's lineage hue, so its own kin read the
+        // warning loudest (their alarm response, weighted by their kinship gene,
+        // keys off how close the dead one's hue is to theirs).
+        world.scent.emit(
+          victim.x,
+          victim.y,
+          SCENT.DANGER,
+          CONFIG.scent.dangerStrength,
+          victim.lineageHue,
+        );
       }
     }
 

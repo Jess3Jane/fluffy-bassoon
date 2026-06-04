@@ -26,8 +26,10 @@ const MAX_CREATURE_RADIUS = CONFIG.creature.radius * GENES.size[1];
 // stale data is rejected rather than loaded into a mismatched world. v2 added
 // the terrain seed; v3 added the scent / pheromone field; v4 added the heritable
 // scent-signalling genes (a pre-v4 genome lacks them, so its behaviour would be
-// undefined — better to reject the save than load a NaN-steered creature).
-const SAVE_VERSION = 4;
+// undefined — better to reject the save than load a NaN-steered creature); v5
+// added the `kinship` gene and a per-plume emitter hue (a pre-v5 genome lacks
+// kinship, and its plumes carry no hue to weight by).
+const SAVE_VERSION = 5;
 
 export class World {
   // `seed: false` builds an empty world (no starting food/creatures, rng
@@ -264,7 +266,19 @@ export class World {
       if (c.alive) survivors.push(c);
       else this.deaths++;
     }
-    this.creatures = survivors.concat(newborns);
+    // A creature can be killed by a predator *after* it has already taken its
+    // own turn (so it was pushed alive above, then died later in the loop). Sweep
+    // those out now rather than carrying an inert corpse into the next step: a
+    // dead creature draws no rng and is skipped by every query, so removing it a
+    // step early changes nothing about the dynamics — but it keeps the live list
+    // free of dead entries at the step boundary, so a save taken there (which
+    // filters them) is a true, divergence-free continuation.
+    const living = [];
+    for (const c of survivors) {
+      if (c.alive) living.push(c);
+      else this.deaths++;
+    }
+    this.creatures = living.concat(newborns);
 
     // Drop food eaten this step (flagged by consumeFoodNear).
     let eaten = false;
@@ -294,6 +308,7 @@ export class World {
       alarmVoice: 0,
       foodTrust: 0,
       alarmTrust: 0,
+      kinship: 0,
     };
     let maxGen = 0;
     let energy = 0;
@@ -308,6 +323,7 @@ export class World {
       avg.alarmVoice += c.genome.alarmVoice;
       avg.foodTrust += c.genome.foodTrust;
       avg.alarmTrust += c.genome.alarmTrust;
+      avg.kinship += c.genome.kinship;
       energy += c.energy;
       if (c.genome.diet > CONFIG.creature.carnivoreThreshold) carnivores++;
       if (c.generation > maxGen) maxGen = c.generation;
