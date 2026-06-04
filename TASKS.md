@@ -81,9 +81,25 @@ population dynamics, natural selection, and surprising behaviour.
       renderer washes the scene with a deepening night veil, and the HUD shows the
       phase (Day / Dusk / Night / Dawn) and daylight percentage.
 
+- [x] Terrain (water, fertile, barren) influencing movement and food. A static
+      tile map (`src/terrain.js`) is grown from a single seed with wrapping
+      value-noise — two fields (elevation carves water, moisture splits fertile
+      vs. barren on dry land) thresholded into four tile kinds, mostly grassland.
+      It tiles seamlessly across the toroidal world. Terrain shapes two things:
+      **food** (random growth makes a few attempts and keeps the first spot whose
+      tile *fertility* wins a roll, so plants cluster on fertile soil, thin out on
+      barren ground, and never sprout on water) and **movement** (a per-tile
+      *speed* multiplier — water bogs creatures to a crawl while they keep burning
+      base metabolism, making it a natural barrier and refuge). The map needs no
+      serialized state beyond `terrainSeed`: `World` regrows it bit-identically on
+      load (`SAVE_VERSION` bumped to 2), and terrain generation runs on its own
+      internal rng so it never perturbs the main simulation stream. The renderer
+      paints a grass backdrop and lays the water/fertile/barren patches over it.
+
 ## Next up
 
-- [ ] Terrain (water, fertile, barren) influencing movement and food.
+- [ ] Weather / seasons layered over the day-night cycle (rain boosting food,
+      droughts thinning it) for longer-period boom/bust dynamics.
 
 ## Ideas / someday
 

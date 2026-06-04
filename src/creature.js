@@ -136,9 +136,11 @@ export class Creature {
     // Wanderers don't commit fully even when they see food.
     this.heading += turn * (target ? 1 : 1 - 0.3 * g.wander);
 
-    // --- Move. ---
+    // --- Move. Terrain underfoot scales travel: open ground is free, but water
+    // bogs a creature down, so it crawls across (and burns base metabolism the
+    // whole time), making water a natural barrier and refuge. ---
     const speed = g.speed;
-    const dist = speed * dt;
+    const dist = speed * dt * world.terrain.speedAt(this.x, this.y);
     this.x = wrap(this.x + Math.cos(this.heading) * dist, world.width);
     this.y = wrap(this.y + Math.sin(this.heading) * dist, world.height);
 

@@ -3,6 +3,16 @@
 
 import { CONFIG } from "./config.js";
 import { daylight } from "./daycycle.js";
+import { TILE } from "./terrain.js";
+
+// Fill colours per tile kind, indexed by the TILE enum. Grass doubles as the
+// world backdrop, so only the patches that differ from it are drawn over the top.
+const TILE_COLORS = [
+  "#0e1a17", // grass — the base ground
+  "#15364e", // water — deep blue
+  "#163a22", // fertile — rich green
+  "#332b1d", // barren — dry brown
+];
 
 export class Renderer {
   constructor(canvas) {
@@ -52,9 +62,9 @@ export class Renderer {
     ctx.translate(this.offsetX, this.offsetY);
     ctx.scale(this.scale, this.scale);
 
-    // World bounds backdrop.
-    ctx.fillStyle = "#0c1119";
-    ctx.fillRect(0, 0, world.width, world.height);
+    // Terrain. Paint the grass backdrop in one fill, then lay the water /
+    // fertile / barren patches over it tile by tile.
+    this.drawTerrain(ctx, world.terrain);
     ctx.strokeStyle = "rgba(111, 211, 199, 0.15)";
     ctx.lineWidth = 1 / this.scale;
     ctx.strokeRect(0, 0, world.width, world.height);
@@ -81,6 +91,24 @@ export class Renderer {
     }
 
     ctx.restore();
+  }
+
+  drawTerrain(ctx, terrain) {
+    // Grass backdrop covers the whole world; non-grass tiles are drawn on top.
+    ctx.fillStyle = TILE_COLORS[TILE.GRASS];
+    ctx.fillRect(0, 0, terrain.width, terrain.height);
+
+    const { cols, rows, tileW, tileH, tiles } = terrain;
+    // Overlap tiles a hair so seams between same-coloured neighbours don't show.
+    const pad = 0.5 / this.scale;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const type = tiles[r * cols + c];
+        if (type === TILE.GRASS) continue;
+        ctx.fillStyle = TILE_COLORS[type];
+        ctx.fillRect(c * tileW - pad, r * tileH - pad, tileW + pad * 2, tileH + pad * 2);
+      }
+    }
   }
 
   drawCreature(ctx, c) {

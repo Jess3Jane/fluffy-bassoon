@@ -57,6 +57,27 @@ export const CONFIG = {
     nightFoodGrowth: 0.2, // food growth at midnight, as a fraction of noon's
   },
 
+  // Terrain: a static, seed-generated map of tiles under the world. Most of it
+  // is ordinary grassland; wrapping value-noise carves out patches of water,
+  // fertile soil, and barren ground that shape where food grows (`fertility`,
+  // the chance a food-spawn attempt on the tile takes root) and how freely
+  // creatures move across it (`speed`, a multiplier on travel distance). The
+  // whole map is reproduced from `terrainSeed`, so only that seed is saved.
+  terrain: {
+    cols: 48, // horizontal tile resolution; rows derived from world aspect
+    latticeCols: 7, // control-point grid for the noise (wraps toroidally)
+    latticeRows: 5,
+    // Thresholds on the two noise fields. Elevation below `waterLevel` is water;
+    // on dry land, moisture above `fertileLevel` is fertile and below
+    // `barrenLevel` is barren, with grassland in between.
+    waterLevel: 0.3,
+    fertileLevel: 0.66,
+    barrenLevel: 0.36,
+    foodAttempts: 6, // tries to find a fertile spot per random food spawn
+    speed: { grass: 1.0, water: 0.45, fertile: 1.0, barren: 0.92 },
+    fertility: { grass: 0.85, water: 0.0, fertile: 1.0, barren: 0.3 },
+  },
+
   // Spatial hashing: the cell size used to bucket entities for neighbour
   // queries. Roughly the typical query radius — small enough that few entities
   // share a cell, large enough that a sense-radius query spans only a handful

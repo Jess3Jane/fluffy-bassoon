@@ -22,6 +22,13 @@ rhythm, and food regrows fast in the light but slowly in the dark. The larder â€
 and the population that lives off it â€” breathes with the cycle, and the world
 visibly dims at night.
 
+The world is laid over a **terrain** map of grassland dotted with patches of
+water, fertile soil, and barren ground. Food springs up thickest on fertile
+soil, sparsely on barren ground, and never on water; creatures wade slowly
+through water, so it becomes a natural barrier and refuge that shapes where life
+concentrates. The map is grown from a single seed (saved with the world, so it
+returns intact on load) using wrapping noise, so every world looks different.
+
 ## Run it
 
 It's a static site with no build step. Either open `index.html` through a local
