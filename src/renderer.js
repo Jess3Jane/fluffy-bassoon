@@ -2,6 +2,7 @@
 // viewport while preserving aspect ratio (letterboxed if needed).
 
 import { CONFIG } from "./config.js";
+import { daylight } from "./daycycle.js";
 
 export class Renderer {
   constructor(canvas) {
@@ -69,6 +70,14 @@ export class Renderer {
     // Creatures.
     for (const c of world.creatures) {
       this.drawCreature(ctx, c);
+    }
+
+    // Night veil: a translucent dark-blue wash over the whole scene that
+    // deepens as daylight fades, so the day-night cycle reads at a glance.
+    const darkness = 1 - daylight(world.time);
+    if (darkness > 0.001) {
+      ctx.fillStyle = `rgba(6, 10, 28, ${(darkness * 0.55).toFixed(3)})`;
+      ctx.fillRect(0, 0, world.width, world.height);
     }
 
     ctx.restore();

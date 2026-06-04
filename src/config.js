@@ -47,6 +47,16 @@ export const CONFIG = {
     meatBodyEnergy: 5,
   },
 
+  // Day-night cycle: a raised-cosine daylight level on a fixed sim-time period
+  // that modulates how fast food regrows (and tints the world). Food grows at
+  // the full `food.spawnPerSecond` at noon and tapers toward `nightFoodGrowth`
+  // of that at midnight, so the population breathes with the cycle — plenty by
+  // day, leaner by night — without the larder ever stopping entirely.
+  dayNight: {
+    periodSeconds: 90, // length of one full day→night→day cycle, in sim-time
+    nightFoodGrowth: 0.2, // food growth at midnight, as a fraction of noon's
+  },
+
   // Spatial hashing: the cell size used to bucket entities for neighbour
   // queries. Roughly the typical query radius — small enough that few entities
   // share a cell, large enough that a sense-radius query spans only a handful

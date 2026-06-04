@@ -8,6 +8,7 @@ import { Creature, reserveIds } from "./creature.js";
 import { SpatialGrid } from "./grid.js";
 import { GENES } from "./genome.js";
 import { wrapDistSq } from "./math.js";
+import { daylight, foodGrowthFactor } from "./daycycle.js";
 
 // Largest a creature's body can get, used to size contact-query windows.
 const MAX_CREATURE_RADIUS = CONFIG.creature.radius * GENES.size[1];
@@ -143,8 +144,11 @@ export class World {
   update(dt) {
     this.time += dt;
 
-    // Grow food over time.
-    this.foodSpawnAccumulator += CONFIG.food.spawnPerSecond * dt;
+    // Grow food over time, scaled by the day-night cycle: plants regrow fast in
+    // daylight and slowly at night, so the food supply (and the population that
+    // lives off it) breathes with the cycle.
+    this.foodSpawnAccumulator +=
+      CONFIG.food.spawnPerSecond * foodGrowthFactor(this.time) * dt;
     while (this.foodSpawnAccumulator >= 1) {
       this.spawnFood();
       this.foodSpawnAccumulator -= 1;
@@ -213,6 +217,7 @@ export class World {
       population: n,
       food: this.food.length,
       time: this.time,
+      daylight: daylight(this.time),
       generation: maxGen,
       peak: this.peakPopulation,
       avgEnergy: energy,
