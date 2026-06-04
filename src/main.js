@@ -112,6 +112,7 @@ function updateHud() {
     row("Alarm trust", s.avg.alarmTrust.toFixed(2)),
     row("Kinship", s.avg.kinship.toFixed(2)),
     row("Mating", s.avg.mating.toFixed(2)),
+    row("Mate choice", s.avg.mateChoice.toFixed(2)),
   ].join("");
 }
 

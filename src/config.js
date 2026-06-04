@@ -37,6 +37,16 @@ export const CONFIG = {
     // enough that the clustering the scent/kin/herding layers already drive
     // usually puts a partner in reach, without needing dedicated mate-seeking.
     mateRadius: 90,
+    // Mate choice: among the partners within `mateRadius`, a breeder scores each
+    // by `mateChoice·hue-match − mateChoiceDistWeight·(distance/mateRadius)` and
+    // picks the best. This weight sets how dearly distance is paid against a
+    // better-matched mate: at 1.0, a full-strength hue preference can exactly
+    // offset a partner sitting a full radius further away, so preference and
+    // proximity carry equal pull. Lower it to let choice reach further for the
+    // right hue; raise it to keep mating local. At a neutral `mateChoice` (0.5)
+    // the hue term vanishes and the score is pure distance — i.e. nearest wins,
+    // the old behaviour — regardless of this weight.
+    mateChoiceDistWeight: 1.0,
 
     maxAgeSeconds: 90, // soft cap; older creatures get a metabolism penalty
 

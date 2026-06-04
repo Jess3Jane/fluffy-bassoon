@@ -56,10 +56,14 @@ const RADIUS = CONFIG.creature.mateRadius;
   assert.ok(sawFromA && sawFromB, "crossover draws from both parents, not just one");
 }
 
-// --- World.findMate: nearest live other creature within radius, or null. ---
+// --- World.findMate: at a neutral mateChoice (0.5) the preference term drops
+//     out and it reduces to the old "nearest live other creature within radius,
+//     or null" behaviour. (Mate *choice* — a non-neutral preference — has its
+//     own test/mate-choice.test.mjs.) ---
 {
   const world = new World(makeRng(2), { seed: false });
   const self = world.spawnCreature(600, 400);
+  self.genome.mateChoice = 0.5; // no preference → pure nearest
 
   // Alone → no mate.
   world.creatureGrid.rebuild(world.creatures);
@@ -73,6 +77,7 @@ const RADIUS = CONFIG.creature.mateRadius;
 
   // A candidate just beyond the radius is ignored.
   const lonely = world.spawnCreature(800, 400);
+  lonely.genome.mateChoice = 0.5;
   world.creatureGrid.rebuild(world.creatures);
   const m = world.findMate(lonely, RADIUS);
   assert.ok(m !== lonely, "findMate never returns self");

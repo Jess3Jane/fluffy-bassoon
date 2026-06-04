@@ -320,16 +320,55 @@ population dynamics, natural selection, and surprising behaviour.
       reproduce paths (clone at mating 0 even beside a partner, a real cross at
       mating 1 with a mate, the solo fallback to cloning, and generation bumps).
 
+- [x] Mate *choice*, the natural follow-up to sexual reproduction. A breeder used
+      to pair with whoever was nearest; now a heritable `mateChoice` gene
+      (`src/genome.js`, in `[0,1]` so it mutates and clamps like any other) shapes
+      *whom* it picks, along the same lineage-hue axis kin recognition already
+      reads. The gene is centred at 0.5: `World.findMate` scores each candidate in
+      reach by `pref·(2·hueSim − 1) − distWeight·(dist/radius)` (where
+      `pref = 2·mateChoice − 1 ∈ [−1, 1]` and `hueSim` is the same
+      `hueSimilarity`/`kinTolerance` closeness used by the scent layer) and takes
+      the best. Above 0.5 the creature mates **assortatively** — it rewards
+      hue-similar partners (homogamy), which can pull a clade toward reproductive
+      isolation and so hands speciation a lever; below 0.5 it mates
+      **disassortatively** — it rewards hue-distant partners (outbreeding /
+      inbreeding avoidance), keeping a lineage mixing with strangers. The
+      preference trades off against distance through a new
+      `creature.mateChoiceDistWeight` (at 1.0, a full-strength hue preference can
+      exactly offset a partner sitting a full radius further off), so choice only
+      bends the pick among the partners actually in reach, and only bites when
+      there is a real hue spread to choose across: at a neutral `mateChoice` (0.5)
+      the hue term vanishes and the score is pure −distance, so it reduces
+      *exactly* to the old "nearest wins" (a missing gene defaults to neutral too),
+      and when every candidate is a stranger (or every one kin) the hue term is
+      constant across them and distance breaks the tie back to nearest. This is the
+      sexual-selection counterpart to `mating`: that gene sets *whether* to mix
+      genes, `mateChoice` sets *with whom*. `findMate` still draws no fresh rng, so
+      a restored world replays bit-identically; the gene rides the existing genome
+      serialization (`SAVE_VERSION` bumped to 7 so a pre-`mateChoice` save is
+      rejected rather than mated off a NaN preference). `stats()` averages
+      `mateChoice` and the HUD shows a **Mate choice** row, so the population's
+      drift toward homogamy, indifference, or outbreeding is legible.
+      `test/mate-choice.test.mjs` covers the gene, the equidistant kin-vs-stranger
+      pick at each extreme, the preference overruling distance within the radius,
+      the fall back to nearest with no hue spread / at neutral / with the gene
+      missing, and that the choice is wired through `reproduce` (an assortative
+      breeder actually crosses with the far kin it picks, never the near stranger).
+
 ## Next up
 
-- [ ] Mate *choice*, the natural follow-up to sexual reproduction: right now a
-      breeder pairs with whoever's nearest. Let selection shape *who* it pairs
-      with — e.g. reuse the `kinship` gene / lineage hue for assortative mating
-      (prefer kin, or avoid close inbreeding), or pick by diet/size — so sexual
-      selection and speciation have a lever. Or pick another seed below.
+- [ ] Make mate choice *cost* something, so sexual selection has a real tension
+      rather than a free preference. Right now a picky breeder pays nothing to
+      reach past the nearest body for a better-matched one. Options: a courtship
+      energy/time cost that scales with how far the chosen mate is (or how picky
+      the gene is), an explicit mate-search radius gene that trades reach against
+      metabolism, or letting the *chosen* partner also exercise a veto (mutual
+      choice) so a pairing needs both to agree. Or pick another seed below.
 
 ## Ideas / someday
 
 - Simple neural-net brains instead of hand-tuned genome weights.
-- Mate choice / sexual selection: assortative mating or inbreeding avoidance
-  layered over the crossover already in place.
+- Speciation readout: with assortative mate choice now able to isolate clades,
+  track and surface *how many* distinct lineage-hue clusters are breeding-isolated
+  over time (a species count in the HUD / a charts panel), so emergent speciation
+  is legible rather than only inferable from the colour bands.

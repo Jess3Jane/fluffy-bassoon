@@ -106,6 +106,21 @@ only where the scent/kin/herding layers have already drawn creatures together.
 Whether a lineage drifts toward mixing or faithful cloning is left to selection,
 with `mating` tracked in the HUD.
 
+Sexual reproduction in turn grows a **mate choice**. A breeder no longer just
+takes the nearest partner: a heritable `mateChoice` trait, centred at neutral,
+shapes *whom* it picks along the same lineage-hue axis kin recognition reads.
+Above neutral the creature mates **assortatively** — preferring partners whose
+hue is close to its own, a homogamy that can pull a clade toward reproductive
+isolation and hands speciation a lever; below neutral it mates
+**disassortatively** — preferring hue-distant partners, an outbreeding /
+inbreeding-avoidance pull that keeps a lineage mixing with strangers. The
+preference is paid against distance, so it only bends the choice among the
+partners already in reach and only bites when there's a real hue spread to choose
+across — with everyone a stranger (or everyone kin), or at a neutral gene, it
+collapses back to nearest, the old behaviour. Where `mating` decides *whether* to
+mix genes, `mateChoice` decides *with whom*, and the HUD tracks where the
+population lands.
+
 ## Run it
 
 It's a static site with no build step. Either open `index.html` through a local
@@ -141,7 +156,8 @@ Or just use the deployed GitHub Pages site.
   strength once a storm raises one), the live scent-plume count, and average
   traits — including diet, the four heritable signalling traits (food/alarm
   voice and trust), `kinship` (how strongly the creature filters scent by the
-  caller's lineage), and `mating` (how readily it breeds sexually vs. clones).
+  caller's lineage), `mating` (how readily it breeds sexually vs. clones), and
+  `mateChoice` (assortative vs. disassortative partner preference).
 - Two **history charts** in the HUD trace the world over time: a population
   panel (total population with the carnivore sub-band) and an average-trait
   panel (diet plus speed/size normalised onto a shared 0–1 axis), so you can
