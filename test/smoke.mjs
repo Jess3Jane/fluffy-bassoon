@@ -56,6 +56,12 @@ for (let i = 0; i < STEPS; i++) {
         const v = c.genome[name];
         assert.ok(v >= min - 1e-6 && v <= max + 1e-6, `gene ${name} in range`);
       }
+      const hue = c.genome.lineageHue;
+      assert.ok(
+        Number.isFinite(hue) && hue >= 0 && hue < 360,
+        `lineage hue in [0,360), got ${hue}`,
+      );
+      assert.equal(c.lineageHue, hue, "creature caches its lineage hue");
     }
   }
 }

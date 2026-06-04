@@ -19,7 +19,8 @@ export class Creature {
     this.heading = rng.range(0, Math.PI * 2);
     this.energy = CONFIG.creature.startEnergy;
     this.age = 0;
-    this.hue = genomeHue(genome);
+    this.hue = genomeHue(genome); // trophic colour (diet → green/red)
+    this.lineageHue = genome.lineageHue; // neutral clade colour
     this.alive = true;
     this.generation = 0;
   }

@@ -27,10 +27,17 @@ population dynamics, natural selection, and surprising behaviour.
       Behaviour-identical to the old linear scan (the smoke test cross-checks
       grid queries against brute force), and ~5× faster at ~1k creatures plus
       thousands of plants — the gap widening as the world grows.
+- [x] Lineage / species colouring driven by genome so clades are visible. Each
+      genome carries a neutral `lineageHue` marker (`src/genome.js`) that is
+      inherited and drifts a few degrees per generation, so a founder and its
+      descendants share a colour while diverged clades drift apart into distinct
+      colour bands. The marker affects nothing about behaviour and lives outside
+      `GENES` (it wraps the colour wheel rather than clamping). A HUD button
+      toggles the renderer between **Trophic** colouring (diet → green/red) and
+      **Lineage** colouring (the clade marker).
 
 ## Next up
 
-- [ ] Lineage / species colouring driven by genome so clades are visible.
 - [ ] Charts: population and trait history over time.
 - [ ] Save / load world state to localStorage.
 - [ ] Interactive tools: click to add food, drag to spawn creatures.

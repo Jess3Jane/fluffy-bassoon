@@ -20,6 +20,11 @@ export function randomGenome(rng) {
   for (const [name, [min, max]] of Object.entries(GENES)) {
     g[name] = rng.range(min, max);
   }
+  // Neutral lineage marker: a hue (degrees) carried down to offspring with a
+  // slight drift, so a founder and its descendants share a colour and clades
+  // become visible. It affects nothing about behaviour, so it lives outside
+  // GENES — it wraps around the colour wheel rather than clamping to a range.
+  g.lineageHue = rng.range(0, 360);
   return g;
 }
 
@@ -33,6 +38,12 @@ export function mutate(genome, rng) {
     }
     child[name] = Math.min(max, Math.max(min, v));
   }
+  // Drift the lineage marker a little each generation: a clade stays close to
+  // its founder's colour while slowly diverging from cousins, so distinct
+  // colour bands trace distinct lineages.
+  child.lineageHue = wrapHue(
+    genome.lineageHue + rng.normal() * CONFIG.mutation.lineageDrift,
+  );
   return child;
 }
 
@@ -49,4 +60,9 @@ export function genomeHue(genome) {
 function norm(name, value) {
   const [min, max] = GENES[name];
   return (value - min) / (max - min);
+}
+
+// Wrap a hue into [0, 360).
+function wrapHue(h) {
+  return ((h % 360) + 360) % 360;
 }

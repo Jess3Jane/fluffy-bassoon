@@ -59,5 +59,9 @@ export const CONFIG = {
   mutation: {
     rate: 0.9, // probability a child mutates at all
     amount: 0.12, // relative magnitude of a mutation step
+    // Per-reproduction drift (degrees, std-dev) of the neutral lineage-hue
+    // marker. Small enough that a clade stays roughly one colour, large enough
+    // that long-diverged lineages drift visibly apart.
+    lineageDrift: 5,
   },
 };
