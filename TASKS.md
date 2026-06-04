@@ -576,15 +576,56 @@ population dynamics, natural selection, and surprising behaviour.
       `preyDensity`), the meat-yield scaling through a real kill, the stats wiring,
       and the gene round-tripping through save/load (with a pre-v9 save rejected).
 
+- [x] The two plant kinds now have *different traits*, so a forage specialism
+      trades off against the day-night cycle instead of being a symmetric
+      coin-flip. A new module `src/plants.js` owns everything about how the kinds
+      differ — `plantKindAt` (moved here, unchanged: the spatial patchwork that
+      decides *where* each kind grows) plus the new bit, `kindYieldFactor(kind,
+      time)`, which decides what a kind is *worth right now*. Each kind carries a
+      `kindTraits` entry (`src/config.js`): an `energy` richness, a `dayLit` flag
+      (peaks by day vs. night), and a `rhythmDepth` (how deeply its yield dips out
+      of phase). The factor is `energy × rhythm`, where the rhythm rides the
+      day-night `daylight` curve — 1 in the kind's own half of the cycle, dipping
+      toward `1 − rhythmDepth` in the other, inheriting the raised-cosine's smooth
+      dawn/dusk shoulders rather than switching hard. The two are deliberately
+      *asymmetric*: **kind 0 (sunleaf)** is steady and day-leaning (energy 1.2,
+      shallow 0.35 rhythm — never far from its mean), **kind 1 (moonleaf)** is
+      feast-or-famine (energy 1.5, deep 0.7 rhythm — a richer midnight peak but
+      nearly worthless by day). So which forage specialism *pays* crosses over the
+      cycle: a day-grazer feasts cheaply at noon, a night-grazer reaps richly at
+      midnight, and a generalist trades the convex forage discount for a yield
+      that rides neither swing. Crucially the factor scales only *how much energy*
+      a plant is worth, never *whether* a forager eats it — that stays the
+      time-independent `forageYield` specialism gate, so a specialist still works
+      its own kind at the lean hour, just for less. It folds into `World.forageNear`
+      as a per-pellet multiplier on the energy gained; the eligibility/consumption
+      logic is untouched, so every existing partitioning test still holds. The
+      energies are picked so each kind's yield *averaged over a full day* lands
+      near 1 — this layers a rhythm and a richness asymmetry onto the larder
+      *without* making the world globally leaner (a 10-min headless run holds the
+      same population swings and kill rate as before, and seeds that read as one
+      ecotype now split into 3–4 as grazers diverge onto the two kinds). Being a
+      **pure function of sim-time** (like the day-night/weather/season layers), it
+      adds **no serialized state** — no pellet-shape or genome change, no
+      `SAVE_VERSION` bump — and replays bit-identically across save/load. `stats()`
+      surfaces a live `kindYield` pair and the HUD shows a **Plant yield** row
+      (Sun %/Moon %) beside the larder split; the renderer fades each kind's
+      pellets by its `kindRhythm` so a sunleaf patch glows by day and a moonleaf
+      patch by night, making "which specialism pays now" read straight off the
+      field. `test/plant-traits.test.mjs` covers the yield shape (richness ×
+      rhythm, the rhythm band, the opposite day/night peaks and their cross-over,
+      the smooth dusk intermediate), its flow through `forageNear` (a specialist
+      gains more in its own phase), the `stats()` readout, the HUD labels, and that
+      it slips no state into the save (yields match after a round-trip).
+
 ## Next up
 
-- [ ] Give the two plant kinds *different traits* (the other half of the prior
-      seed), so choosing a forage specialism trades off against the world's
-      rhythms rather than being a symmetric coin-flip: e.g. one kind fast-regrowing
-      but low-energy, the other rich but sparse — or one that thrives by day and
-      one by night, so the day-night / weather / season layers tilt which
-      specialism pays *when*, and a clade must track the cycle (or hedge as a
-      generalist) instead of settling on either band for good. Or pick a seed below.
+- [ ] Make the *other* world rhythms tilt the plant kinds too, not just the
+      day-night cycle: let `kindYieldFactor` (or a sibling) also key off season
+      and/or weather, so e.g. one kind thrives in summer rain and the other in
+      winter drought — stacking a slow boom/bust onto the daily one, so a clade
+      must track multiple cycles at once (or hedge harder as a generalist). Or
+      pick a seed below.
 
 ## Ideas / someday
 

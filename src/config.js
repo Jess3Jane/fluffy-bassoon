@@ -16,10 +16,37 @@ export const CONFIG = {
 
     // Two plant kinds (0 and 1) — a sub-resource axis creatures can partition
     // along. A pellet's kind is a pure function of where it sprouts (a smooth
-    // sine patchwork, `plantKindAt` in world.js), so the two species grow in
-    // distinct regions of the map: a *spatial* niche, and one that adds no rng
-    // draw, so plant kinds don't perturb the deterministic stream.
+    // sine patchwork, `plantKindAt` in src/plants.js), so the two species grow
+    // in distinct regions of the map: a *spatial* niche, and one that adds no
+    // rng draw, so plant kinds don't perturb the deterministic stream.
     kinds: 2,
+
+    // Per-kind traits — what makes the two kinds *more than a symmetric
+    // coin-flip*. Each kind has its own energy `richness` and its own daily
+    // rhythm, so which forage specialism pays shifts with the day-night cycle
+    // (`kindYieldFactor` in src/plants.js), and a clade must track the clock or
+    // hedge as a generalist instead of settling on either band for good:
+    //   • `energy`     — static richness multiplier on `food.energy` for this
+    //                    kind (lean vs. rich).
+    //   • `dayLit`     — true if the kind grows richest by day, false by night;
+    //                    its yield peaks in that half of the cycle and dips in
+    //                    the other.
+    //   • `rhythmDepth`— how deeply the out-of-phase yield dips (0 = no daily
+    //                    swing, dependable; 1 = nearly worthless at the wrong
+    //                    hour, feast-or-famine).
+    // The result is an asymmetric pair: kind 0 a steady "sunleaf" (peaks a
+    // little by day, never far from its mean) and kind 1 a feast-or-famine
+    // "moonleaf" (a richer peak at midnight, but nearly worthless by day). The
+    // energies are picked so each kind's yield *averaged over a full day* lands
+    // near 1 — so this layers a daily rhythm and a richness asymmetry onto the
+    // larder without making the world globally leaner (a day-grazer and a
+    // night-grazer earn about the same over a cycle; they just earn it at
+    // opposite hours), while a generalist trades the convex forage discount for
+    // a yield that rides neither swing.
+    kindTraits: [
+      { energy: 1.2, dayLit: true, rhythmDepth: 0.35 }, // kind 0 — sunleaf: steady, day-leaning
+      { energy: 1.5, dayLit: false, rhythmDepth: 0.7 }, // kind 1 — moonleaf: rich but night-only
+    ],
 
     // Foraging specialism. A creature's heritable `forage` gene (0 → kind 0,
     // 1 → kind 1, 0.5 → generalist) meets a plant's kind to set how much energy

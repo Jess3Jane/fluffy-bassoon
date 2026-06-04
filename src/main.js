@@ -9,6 +9,7 @@ import { Charts } from "./charts.js";
 import { saveWorld, loadWorld, hasSavedWorld } from "./persistence.js";
 import { ToolController, TOOLS, TOOL_LABELS } from "./tools.js";
 import { phaseLabel } from "./daycycle.js";
+import { kindLabel } from "./plants.js";
 import { seasonLabel, weatherLabel, windStrength, windLabel } from "./weather.js";
 
 const FIXED_DT = 1 / 60; // simulation step, seconds
@@ -93,6 +94,10 @@ function updateHud() {
     row("Isolation", isolationRow(s.isolation)),
     row("Carnivores", s.carnivores),
     row("Food", `${s.food} (${s.foodByKind[0]}/${s.foodByKind[1]})`),
+    row(
+      "Plant yield",
+      `${kindLabel(0)} ${Math.round(s.kindYield[0] * 100)}% / ${kindLabel(1)} ${Math.round(s.kindYield[1] * 100)}%`,
+    ),
     row("Scent", s.scent),
     row("Top gen", s.generation),
     row("Time", formatTime(s.time)),
