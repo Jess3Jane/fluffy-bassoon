@@ -9,7 +9,13 @@ import { SpatialGrid } from "./grid.js";
 import { GENES } from "./genome.js";
 import { wrapDistSq } from "./math.js";
 import { daylight, foodGrowthFactor } from "./daycycle.js";
-import { seasonLevel, weatherNoise, climateFoodFactor } from "./weather.js";
+import {
+  seasonLevel,
+  weatherNoise,
+  climateFoodFactor,
+  windStrength,
+  windDirection,
+} from "./weather.js";
 import { Terrain } from "./terrain.js";
 
 // Largest a creature's body can get, used to size contact-query windows.
@@ -201,6 +207,23 @@ export class World {
       this.foodSpawnAccumulator -= 1;
     }
 
+    // Storm winds carry loose food/spores downwind: while a gale blows, every
+    // pellet drifts a little along the prevailing bearing, so a storm slowly
+    // rakes the larder across the world in the same direction it herds the
+    // creatures. Pure in sim-time (the drift is a function of the wind clock and
+    // the pellet's own position), so it replays bit-identically across save/load.
+    const wind = windStrength(this.time);
+    if (wind > 0) {
+      const dir = windDirection(this.time);
+      const step = wind * CONFIG.weather.windFoodDrift * dt;
+      const dx = Math.cos(dir) * step;
+      const dy = Math.sin(dir) * step;
+      for (const f of this.food) {
+        f.x = wrap(f.x + dx, this.width);
+        f.y = wrap(f.y + dy, this.height);
+      }
+    }
+
     // (Re)build the spatial indices from the current entities so this step's
     // neighbour queries are cheap. Creatures move during the loop below, but
     // queries read each creature's live position — only its *cell* is fixed at
@@ -268,6 +291,8 @@ export class World {
       season: seasonLevel(this.time),
       weather: weatherNoise(this.time),
       climateFood: climateFoodFactor(this.time),
+      wind: windStrength(this.time),
+      windDir: windDirection(this.time),
       generation: maxGen,
       peak: this.peakPopulation,
       avgEnergy: energy,
@@ -333,4 +358,9 @@ export class World {
     rng.setState(data.rngState);
     return world;
   }
+}
+
+// Wrap a coordinate into [0, size) on a toroidal axis.
+function wrap(v, size) {
+  return ((v % size) + size) % size;
 }

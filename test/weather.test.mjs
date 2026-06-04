@@ -15,6 +15,9 @@ import {
   weatherLabel,
   weatherSenseFactor,
   windStrength,
+  windDirection,
+  windBearing,
+  windLabel,
   climateFoodFactor,
 } from "../src/weather.js";
 import { CONFIG } from "../src/config.js";
@@ -145,6 +148,54 @@ const close = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
   assert.ok(max > 0.4, "a storm builds a real wind");
 }
 
+// --- windDirection is a deterministic, continuous, slowly-turning bearing that
+//     exists in all weather (the strength only decides whether it bites).
+{
+  // Pure function of time.
+  assert.equal(windDirection(33.3), windDirection(33.3), "wind direction is deterministic");
+
+  // Continuous: a tiny step in time is a tiny step in bearing (no creases).
+  for (let t = 0; t < 2000; t += 1.3) {
+    const d = Math.abs(windDirection(t + 0.01) - windDirection(t));
+    assert.ok(d < 0.05, `wind direction is continuous near t=${t}, jumped ${d}`);
+  }
+
+  // It genuinely turns: over a full `windTurnSeconds` the bearing advances most
+  // of the way around the compass (steady turn ± a bounded wobble).
+  const turned = windDirection(W.windTurnSeconds) - windDirection(0);
+  assert.ok(
+    Math.abs(turned - 2 * Math.PI) < W.windWobble * 2 + 1e-9,
+    `wind turns ~full circle over windTurnSeconds, advanced ${turned}`,
+  );
+
+  // The wobble keeps the turn from being perfectly even — the bearing wanders.
+  let maxDev = 0;
+  for (let t = 0; t < W.windTurnSeconds; t += W.windTurnSeconds / 200) {
+    const steady = (2 * Math.PI * t) / W.windTurnSeconds;
+    maxDev = Math.max(maxDev, Math.abs(windDirection(t) - steady));
+  }
+  assert.ok(maxDev > 0.1, "the prevailing wind meanders off a perfectly even sweep");
+}
+
+// --- windBearing folds the (unbounded) direction onto [0, 2π); windLabel names
+//     the compass point it pushes toward.
+{
+  for (let t = 0; t < 3000; t += 0.7) {
+    const b = windBearing(t);
+    assert.ok(b >= 0 && b < 2 * Math.PI + 1e-9, `bearing in [0, 2π) at t=${t}, got ${b}`);
+    // The bearing is the direction folded onto the circle: cos/sin must agree.
+    const d = windDirection(t);
+    assert.ok(close(Math.cos(b), Math.cos(d)) && close(Math.sin(b), Math.sin(d)),
+      `bearing matches direction at t=${t}`);
+  }
+  // Every compass point is reachable as the bearing turns through a full circle.
+  const seen = new Set();
+  for (let t = 0; t < W.windTurnSeconds * 2; t += 0.3) seen.add(windLabel(t));
+  for (const point of ["E", "SE", "S", "SW", "W", "NW", "N", "NE"]) {
+    assert.ok(seen.has(point), `wind eventually blows ${point}`);
+  }
+}
+
 // --- climateFoodFactor is the floored product of season and weather, always
 //     strictly positive so the larder never stops entirely.
 {
@@ -168,6 +219,8 @@ const close = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
   assert.ok(close(s.season, 1), "fresh world starts at midsummer");
   assert.ok(close(s.weather, weatherNoise(0)), "stats weather matches the signal");
   assert.ok(close(s.climateFood, climateFoodFactor(0)), "stats climate matches the factor");
+  assert.ok(close(s.wind, windStrength(0)), "stats wind strength matches the signal");
+  assert.ok(close(s.windDir, windDirection(0)), "stats wind direction matches the signal");
 }
 
 // --- The whole layer is pure in sim-time, so a save/load round-trip keeps food
@@ -189,9 +242,13 @@ const close = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
   // one draw, these would drift apart. Ids are deliberately excluded: they are
   // informational labels that can legitimately differ after a restore (dead
   // creatures' ids aren't replayed), as the persistence test documents.
+  // Food is included too: storm winds now drift every pellet downwind, a pure
+  // function of the wind clock and the pellet's position, so it must replay
+  // bit-identically as well.
   const checksum = (w) => {
     let h = 0;
     for (const c of w.creatures) h += c.x * 1.0007 + c.y * 1.013 + c.heading * 7.7;
+    for (const f of w.food) h += f.x * 1.917 + f.y * 2.013;
     return h;
   };
 

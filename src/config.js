@@ -87,6 +87,18 @@ export const CONFIG = {
     senseFloor: 0.45, // sense range in the heaviest downpour, as a fraction of clear
     windOnset: 0.15, // rain milder than this is calm; gusts build past it into storms
     windBuffet: 2.6, // peak heading jitter (radians/sec, std-dev) in a full storm
+
+    // Wind direction: the prevailing wind isn't only a strength but a *bearing*
+    // that turns slowly around the compass (one full turn per `windTurnSeconds`),
+    // wobbled by smooth noise so it meanders rather than sweeping evenly. While a
+    // storm blows, this bearing gives the buffet a *coherent* push — every
+    // creature is nudged the same way, so a gale herds the population downwind
+    // instead of only scattering it — and loose food/spores drift along it too.
+    // All pure in sim-time, so it adds no saved state and replays identically.
+    windTurnSeconds: 200, // sim-time for the prevailing wind to turn full circle
+    windWobble: 1.1, // radians of noise wobble layered on the steady turn
+    windPush: 1.6, // how hard a full gale steers a heading downwind (per second)
+    windFoodDrift: 18, // how fast a full gale drifts loose food downwind (units/sec)
   },
 
   // Terrain: a static, seed-generated map of tiles under the world. Most of it
