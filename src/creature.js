@@ -211,7 +211,19 @@ export class Creature {
         // loudly as the `foodVoice` gene dictates, and at an energy price. A
         // silent grazer keeps its larder secret for free; a loud one pays to
         // advertise it (a cost only worth bearing if being heard ever helps).
-        this.signal(world, SCENT.FOOD, CONFIG.scent.foodStrength * g.foodVoice);
+        //
+        // Kin-weighted emission: the same `kinship` gene that decides whom to
+        // heed (`ScentField.steer`) also decides when to bother calling. We read
+        // the local kin density off the creature grid and gate the call by it —
+        // `1 − kinship·(1 − density)`, the exact mirror of the response weight —
+        // so a kin-blind creature (kinship 0) calls at full voice as before,
+        // while a kin-tuned one hushes among strangers (where advertising only
+        // feeds competitors) and calls up when relatives are near to benefit.
+        // The hush is *free*: a faint-enough plume falls below the decay floor
+        // and `signal` skips it without spending energy.
+        const density = world.kinDensity(this, g.sense);
+        const kinGain = 1 - g.kinship * (1 - density);
+        this.signal(world, SCENT.FOOD, CONFIG.scent.foodStrength * g.foodVoice * kinGain);
       }
     }
 

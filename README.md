@@ -73,6 +73,17 @@ carry the same calling gene) can pay off through inclusive fitness. So the
 signalling arena becomes a tension between kin-directed honesty and
 stranger-directed deception, with `kinship` in the HUD tracking where it lands.
 
+The `kinship` trait now works both ways. Besides choosing *whom to heed*, a
+creature also chooses *when to bother calling*: it reads how many close kin are
+within earshot (a quick hue-weighted headcount off the creature grid) and gates
+its food call by it, through the same gene and the same maths as the response
+side. A kin-blind creature still calls at full voice no matter who's around; a
+kin-keen one falls silent among strangers — where advertising only feeds rivals —
+and calls up to full voice when relatives cluster nearby to benefit. The hush is
+free (too faint a call is never laid, so it costs no energy), so advertising is
+paid for only when kin are there to repay it — which lets `foodVoice` and
+`kinship` co-evolve instead of leaving all the work to the listener.
+
 ## Run it
 
 It's a static site with no build step. Either open `index.html` through a local
