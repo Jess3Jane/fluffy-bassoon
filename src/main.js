@@ -109,6 +109,7 @@ function updateHud() {
     row("Avg wander", s.avg.wander.toFixed(2)),
     row("Avg diet", s.avg.diet.toFixed(2)),
     row("Avg forage", s.avg.forage.toFixed(2)),
+    row("Avg hunt", s.avg.hunt.toFixed(2)),
     divider(),
     row("Food voice", s.avg.foodVoice.toFixed(2)),
     row("Alarm voice", s.avg.alarmVoice.toFixed(2)),

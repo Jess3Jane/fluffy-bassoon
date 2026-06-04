@@ -5,7 +5,7 @@
 // not from cleverness in any single individual.
 
 import { CONFIG } from "./config.js";
-import { randomGenome, mutate, crossover, genomeHue, hueSimilarity } from "./genome.js";
+import { randomGenome, mutate, crossover, genomeHue, hueSimilarity, huntYield } from "./genome.js";
 import { wrapDelta, wrapDistSq } from "./math.js";
 import { weatherSenseFactor, windStrength, windDirection } from "./weather.js";
 import { SCENT } from "./scent.js";
@@ -254,8 +254,18 @@ export class Creature {
         } else {
           victim.alive = false;
           world.kills++;
+          // Meat yield scales not just with how carnivorous we are, but with how
+          // well our `hunt` specialism matches the victim's body size: a predator
+          // tuned to this prey's size gets full value, one reaching to the edge of
+          // its preferred band a discount (and beyond it the strike never happens
+          // — preyInReach left that body alone). So committing to one prey-size
+          // band pays a clade that splits onto it, the disruptive-selection payoff
+          // behind the second trophic level's niche partitioning — the predator
+          // echo of `forageNear` weighting a grazer's yield by its plant kind.
           this.gain(
-            g.diet * (victim.energy * c.meatEnergyEff + victim.radius * c.meatBodyEnergy),
+            g.diet *
+              huntYield(g.hunt, victim.genome.size) *
+              (victim.energy * c.meatEnergyEff + victim.radius * c.meatBodyEnergy),
           );
           // A kill spills a strong "danger" plume where the prey fell — blood on
           // the wind that sends other prey fleeing and draws other predators in.

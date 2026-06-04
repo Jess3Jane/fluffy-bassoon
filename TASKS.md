@@ -532,18 +532,59 @@ population dynamics, natural selection, and surprising behaviour.
       both kinds growing in a seeded world, and the kind round-tripping through
       save/load.
 
+- [x] Niche partitioning at the **second trophic level**, so the predator niche
+      splits by prey size the way `forage` splits the grazer niche by plant kind —
+      predation is no longer a single `diet` axis over one undifferentiated prey
+      pool. A new heritable gene `hunt` (`src/genome.js`, in `[0,1]` so it mutates
+      and clamps like any other) is a carnivore's *preferred prey size* on the
+      normalised `size` axis: near 0 a small-prey specialist, near 1 a large-prey
+      specialist, mid a medium-body hunter. `huntYield(hunt, preySize)` is the
+      single source of truth — the prey-size mirror of `forageYield`: it normalises
+      the victim's `size` gene onto `[0,1]`, takes `match = 1 − |hunt − sizeN|`
+      (how closely the preference lands on the body), raises it to
+      `huntExponent` (1.4, > 1 so the curve is **convex** — honing onto one
+      prey-size band out-yields hunting across all sizes, the disruptive-selection
+      pressure), and returns 0 below `huntMinEff` (0.25, mirroring the forage
+      constants). The gene drives both *whom* a predator hunts and *how much* it
+      gains: `World.nearestPrey` / `preyInReach` skip any body whose `huntYield`
+      is 0 (a small-prey hunter *leaves* the big bodies for a large-prey ecotype —
+      clean partitioning, not interference that strips a shared prey pool), and a
+      kill's meat is scaled by `huntYield` in `Creature.update` (a size-matched
+      catch yields full meat, a band-edge one a discount), so committing to one
+      prey-size band pays the clade that splits onto it. `World.preyDensity` (the
+      safety-in-numbers confusion set) is gated by the same rule — only prey the
+      predator would actually strike at confuse it, so a herd of large bodies does
+      nothing to shield a small victim from a small-prey specialist. All three
+      queries fall back to the old "any catchable prey" behaviour when the `hunt`
+      gene is absent (defensive parallel to `nearestFood` omitting `forage`), so
+      no prior predation caller breaks. Because prey size is *itself* an evolving
+      gene, the two trophic levels co-evolve: size-specialised predators push prey
+      to diversify their bodies to evade them, which hands the predators new modes
+      to split across — a richer feedback than the spatially-fixed plant kinds.
+      Being an ordinary adaptive gene, `hunt` joins `geneVector`, so a split in
+      hunting preference registers in the ecological species count just as a forage
+      split does. The strike and meat draw on the existing rng path (no fresh
+      draws), so a restored world replays bit-identically; `hunt` rides the genome
+      serialization (`SAVE_VERSION` → 9 so a pre-`hunt` save is rejected rather
+      than scored off a NaN yield). `stats()` averages `hunt` and the HUD shows an
+      **Avg hunt** row beside **Avg forage**; the avg-traits chart plots it as a
+      fifth line. A 10-minute headless run holds a stable population with active
+      predation (≈870 kills) and 2 coexisting ecotypes, no NaNs.
+      `test/hunt.test.mjs` covers the yield curve (full-value match, convexity,
+      monotonicity, the floor, size symmetry), the hunt-aware sense/strike/
+      confusion queries (a specialist leaves the off-size body, the gated
+      `preyDensity`), the meat-yield scaling through a real kill, the stats wiring,
+      and the gene round-tripping through save/load (with a pre-v9 save rejected).
+
 ## Next up
 
-- [ ] Examine the PR 25 checkpoint screenshot
-- [ ] The forage split is purely *competitive* (who eats which plant); predation
-      is still a single axis (`diet` herbivore↔carnivore) with one undifferentiated
-      prey pool. A natural next step is to extend partitioning to the **second
-      trophic level** — e.g. prey-size or prey-kind preference so carnivores can
-      specialise on fast-small vs. slow-large prey and partition the predator niche
-      the way `forage` partitions the grazer niche — or to give the two plant kinds
-      *different traits* (one fast-regrowing but low-energy, one rich but sparse) so
-      the choice of which to specialise on trades off against the day-night /
-      weather rhythms rather than being a symmetric coin-flip. Or pick a seed below.
+- [ ] Give the two plant kinds *different traits* (the other half of the prior
+      seed), so choosing a forage specialism trades off against the world's
+      rhythms rather than being a symmetric coin-flip: e.g. one kind fast-regrowing
+      but low-energy, the other rich but sparse — or one that thrives by day and
+      one by night, so the day-night / weather / season layers tilt which
+      specialism pays *when*, and a clade must track the cycle (or hedge as a
+      generalist) instead of settling on either band for good. Or pick a seed below.
 
 ## Ideas / someday
 

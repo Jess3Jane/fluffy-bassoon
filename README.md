@@ -4,8 +4,9 @@ An evolving creature ecosystem that runs entirely in your browser — a complex
 simulated world where emergent complexity is the whole point.
 
 Hundreds of creatures roam a toroidal world looking for food. Each carries a
-small **genome** (speed, sense range, size, metabolism, wanderlust, **diet**, and
-which plant kind it prefers to **forage**). Eating gives energy; moving and living spend it. When a creature has
+small **genome** (speed, sense range, size, metabolism, wanderlust, **diet**,
+which plant kind it prefers to **forage**, and which prey size it prefers to
+**hunt**). Eating gives energy; moving and living spend it. When a creature has
 enough energy it splits in two, passing on a mutated copy of its genome. There
 is no fitness function — survival *is* the fitness function, so the population
 evolves on its own. Watch traits drift, populations boom and crash, and lineages
@@ -30,6 +31,17 @@ coexist, each on its own plant in its own patches — and because `forage` is pa
 of the adaptive genome, that split shows up directly in the *Eco species* count,
 turning it from a passive readout into something the dynamics actively drive
 toward.
+
+The predators partition too, along their own axis: a heritable `hunt` gene sets
+which **prey size** a carnivore specialises on — small bodies at one end, large
+at the other. As with `forage`, the yield curve is convex (honing onto one
+prey-size band out-earns hunting across all sizes) and a specialist simply leaves
+the off-size bodies alone, so a small-prey hunter and a large-prey hunter stop
+competing over the same victims. And because prey size is itself an evolving
+gene, the two trophic levels co-evolve — size-tuned predators push prey to
+diversify their bodies to evade them, which hands the predators new prey-size
+modes to split across, so the predator niche keeps fragmenting in step with the
+prey it eats.
 
 A **day-night cycle** rides over all of it: daylight rises and falls on a fixed
 rhythm, and food regrows fast in the light but slowly in the dark. The larder —

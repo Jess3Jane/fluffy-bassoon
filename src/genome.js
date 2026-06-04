@@ -25,6 +25,25 @@ export const GENES = {
   // this gene enables is exactly what that readout was built to surface.
   forage: [0.0, 1.0], // 0 = kind-0 specialist ↔ 1 = kind-1 specialist (0.5 generalist)
 
+  // Predator-niche specialism along the *prey-size* axis — the second trophic
+  // level's answer to `forage`. Where `forage` partitions grazers across plant
+  // kinds, this partitions carnivores across the size of prey they hunt. The
+  // gene is the predator's preferred prey size (normalised against the `size`
+  // gene range): near 0 it specialises on small prey, near 1 on large prey, and
+  // a mid value targets medium bodies. `huntYield` meets it with a victim's
+  // actual size to set how much a predator gains from that kill — convex around
+  // the preference (so honing in on one prey-size band out-yields hunting across
+  // the whole range) with a floor below which the predator won't bother striking
+  // at all, so a small-prey hunter leaves the big bodies for a large-prey ecotype
+  // (clean partitioning, the mirror of a forage specialist ignoring the off-kind
+  // plant). Being an ordinary adaptive gene it joins `geneVector`, so a split in
+  // hunting preference registers in the ecological species count just as a forage
+  // split does — and because prey size is itself an evolving gene, the two
+  // trophic levels co-evolve: size-specialised predators push prey to diversify
+  // their bodies to evade them, which in turn hands the predators new modes to
+  // split across.
+  hunt: [0.0, 1.0], // preferred prey size: 0 = small-prey ↔ 1 = large-prey specialist
+
   // Scent signalling: how the creature uses the shared pheromone field. These
   // turn the plume layer from a fixed reflex into something selection acts on,
   // so honest signalling, silence, eavesdropping, and deception can all evolve.
@@ -143,6 +162,28 @@ export function forageYield(forage, kind) {
   const match = kind === 1 ? forage : 1 - forage;
   const eff = Math.pow(match, CONFIG.food.forageExponent);
   return eff >= CONFIG.food.forageMinEff ? eff : 0;
+}
+
+// Energy efficiency a predator with this `hunt` gene extracts from prey of the
+// given body `size`, in [0, 1] — the prey-size counterpart of `forageYield`. The
+// prey's size is normalised against the `size` gene range to put it on the same
+// [0, 1] axis as the preference, and `match` is how closely the preference lands
+// on it (1 dead-on, falling linearly to 0 a full axis away). That match is
+// raised to `huntExponent` (> 1, so the curve is convex and a predator that
+// hones onto one prey-size band out-yields one that hunts indiscriminately
+// across sizes: disruptive selection on the second trophic level). Below
+// `huntMinEff` it returns 0 — the predator won't strike at a body too far off
+// its preferred size, leaving it for a differently-tuned ecotype (clean niche
+// partitioning, not interference). This is the single source of truth for both
+// *whether* a predator hunts a given prey (yield > 0) and *how much* meat it
+// gains, used by the prey-targeting sense, the strike, and the confusion-set
+// read alike.
+export function huntYield(hunt, preySize) {
+  const [min, max] = GENES.size;
+  const sizeN = (preySize - min) / (max - min); // prey size on the [0, 1] axis
+  const match = 1 - Math.abs(hunt - sizeN);
+  const eff = Math.pow(match, CONFIG.creature.huntExponent);
+  return eff >= CONFIG.creature.huntMinEff ? eff : 0;
 }
 
 // Map a genome to a hue so a creature's trophic role is visible at a glance:
