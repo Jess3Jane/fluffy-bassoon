@@ -16,11 +16,13 @@ population dynamics, natural selection, and surprising behaviour.
 - [x] Metabolism: moving and living cost energy; eating restores it.
 - [x] Reproduction with mutation; death at zero energy.
 - [x] Live stats overlay (population, food, generation, average traits).
+- [x] Predator / prey dynamics: a heritable `diet` trait (herbivore↔carnivore)
+      lets bigger creatures hunt smaller ones for meat, with a specialist
+      tradeoff (plants vs. prey) and trophic-role colouring. A second trophic
+      level emerges; the carnivore share self-regulates against prey supply.
 
 ## Next up
 
-- [ ] Predator / prey dynamics: a carnivore diet trait so creatures can hunt
-      each other, creating a second trophic level.
 - [ ] Spatial partitioning (grid hashing) so neighbour queries scale to large
       populations.
 - [ ] Lineage / species colouring driven by genome so clades are visible.

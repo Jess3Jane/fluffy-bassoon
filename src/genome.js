@@ -12,6 +12,7 @@ export const GENES = {
   size: [0.6, 1.8], // body-size multiplier (affects metabolism + reach)
   wander: [0.0, 1.0], // tendency to roam vs. beeline to food
   metabolismEff: [0.7, 1.3], // efficiency multiplier on living cost
+  diet: [0.0, 1.0], // 0 = pure herbivore (plants), 1 = pure carnivore (prey)
 };
 
 export function randomGenome(rng) {
@@ -35,12 +36,14 @@ export function mutate(genome, rng) {
   return child;
 }
 
-// Map a genome to a stable-ish hue so related creatures look related. We blend
-// a couple of behavioural genes into a single hue on the colour wheel.
+// Map a genome to a hue so a creature's trophic role is visible at a glance:
+// diet drives the base colour from green (herbivore) through to red
+// (carnivore), with speed adding subtle within-role variation.
 export function genomeHue(genome) {
+  const dietN = norm("diet", genome.diet);
   const speedN = norm("speed", genome.speed);
-  const wanderN = norm("wander", genome.wander);
-  return Math.round((speedN * 0.6 + wanderN * 0.4) * 360) % 360;
+  const base = (1 - dietN) * 120; // 120° green (herbivore) → 0° red (carnivore)
+  return Math.round(base + speedN * 20) % 360;
 }
 
 function norm(name, value) {

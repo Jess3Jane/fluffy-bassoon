@@ -34,7 +34,17 @@ export const CONFIG = {
 
     maxAgeSeconds: 90, // soft cap; older creatures get a metabolism penalty
 
-    senseRadius: 140, // how far a creature can perceive food
+    senseRadius: 140, // how far a creature can perceive food or prey
+
+    // Predation: a creature hunts only if its diet exceeds this threshold, and
+    // can catch prey only if it is at least `predationSizeRatio` times the
+    // prey's radius — so predators must out-size what they eat.
+    carnivoreThreshold: 0.2,
+    predationSizeRatio: 1.05,
+    // Energy extracted from a kill: a fraction of the prey's current energy
+    // plus a bonus for its body mass, all scaled by the predator's diet.
+    meatEnergyEff: 0.6,
+    meatBodyEnergy: 5,
   },
 
   // Mutation applied to each genome gene at birth.
