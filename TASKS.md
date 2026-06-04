@@ -113,11 +113,28 @@ population dynamics, natural selection, and surprising behaviour.
       / Winter / Spring), the weather (Drought…Storm), and the combined climate
       food percentage.
 
+- [x] Weather nudges behaviour, not just the food supply. Two wet-weather effects
+      (`src/weather.js`) layer on top of the climate's food modulation, both —
+      like the rest of the weather layer — *pure functions of `world.time`*, so
+      they add no serialized state and replay bit-identically. Only the wet half
+      of the weather signal bites, so rain and drought trade off against each
+      other: **rain dims sight** (`weatherSenseFactor` shrinks a creature's sense
+      range toward a floor in a downpour, so the food a rain spell grows is harder
+      to actually find) and **storms buffet headings** (`windStrength` ramps up
+      past a calm onset into a gale, and `Creature.update` adds a wind-scaled
+      random kick to the heading each step, knocking even a creature locked onto
+      food off its line). Drought is the dry, calm opposite — clear to see through
+      and still to steer in — so a spell is double-edged: rain feeds the world but
+      fogs and jostles it, drought starves it but leaves it legible. The buffet
+      draws on the main rng, so it stays a true save/load continuation (the
+      weather test's round-trip now checksums creature motion to prove it).
+
 ## Next up
 
-- [ ] Weather should also nudge movement and sensing, not just food — e.g. rain
-      damping sense range (harder to spot food through the downpour) or storms
-      buffeting headings — so spells shape behaviour as well as the food supply.
+- [ ] Wind should have a *direction*, not just a strength — a slowly turning
+      prevailing wind that nudges every heading the same way (and could carry
+      drifting food/spores downwind), so storms herd the population rather than
+      only scattering it, and the buffet gains a coherent push under the gusts.
 
 ## Ideas / someday
 

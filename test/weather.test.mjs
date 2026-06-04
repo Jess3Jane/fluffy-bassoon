@@ -13,6 +13,8 @@ import {
   weatherNoise,
   weatherFactor,
   weatherLabel,
+  weatherSenseFactor,
+  windStrength,
   climateFoodFactor,
 } from "../src/weather.js";
 import { CONFIG } from "../src/config.js";
@@ -107,6 +109,42 @@ const close = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
   }
 }
 
+// --- weatherSenseFactor dims sight in rain and never below the floor: it is 1
+//     in dry/fair weather, drops as the rain builds, and tracks the wet side of
+//     the signal exactly.
+{
+  for (let t = 0; t < 5000; t += 0.37) {
+    const f = weatherSenseFactor(t);
+    assert.ok(
+      f >= W.senseFloor - 1e-9 && f <= 1 + 1e-9,
+      `sense factor within [floor, 1] at t=${t}, got ${f}`,
+    );
+    // Dry or merely fair weather (no rain) leaves sight at full reach.
+    if (weatherNoise(t) <= 0) assert.ok(close(f, 1), `dry weather sees full at t=${t}`);
+    // Where it does dim, it dims exactly in step with how wet it is.
+    const wet = Math.max(0, weatherNoise(t));
+    assert.ok(close(f, 1 - (1 - W.senseFloor) * wet), `sense tracks wetness at t=${t}`);
+  }
+  // The dimming genuinely bites somewhere: a heavy spell cuts sight noticeably.
+  let min = Infinity;
+  for (let t = 0; t < 5000; t += 0.11) min = Math.min(min, weatherSenseFactor(t));
+  assert.ok(min < 0.8, "a downpour meaningfully dims sight");
+}
+
+// --- windStrength is calm except in rain past the onset, then ramps into [0, 1].
+{
+  for (let t = 0; t < 5000; t += 0.37) {
+    const w = windStrength(t);
+    assert.ok(w >= 0 - 1e-9 && w <= 1 + 1e-9, `wind within [0, 1] at t=${t}, got ${w}`);
+    // Calm whenever the rain hasn't built past the onset (incl. all dry weather).
+    if (weatherNoise(t) <= W.windOnset) assert.ok(close(w, 0), `calm below onset at t=${t}`);
+  }
+  // Storms genuinely happen: the wind reaches a strong gale somewhere.
+  let max = 0;
+  for (let t = 0; t < 5000; t += 0.11) max = Math.max(max, windStrength(t));
+  assert.ok(max > 0.4, "a storm builds a real wind");
+}
+
 // --- climateFoodFactor is the floored product of season and weather, always
 //     strictly positive so the larder never stops entirely.
 {
@@ -145,11 +183,25 @@ const close = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
   );
   assert.ok(close(restored.time, world.time), "restored world resumes at the same time");
 
+  // A cheap checksum over every creature's position and heading — sensitive to
+  // the weather sense-dimming and storm buffeting, both of which steer movement
+  // (and the buffet draws on the rng). If the restored stream diverged by even
+  // one draw, these would drift apart. Ids are deliberately excluded: they are
+  // informational labels that can legitimately differ after a restore (dead
+  // creatures' ids aren't replayed), as the persistence test documents.
+  const checksum = (w) => {
+    let h = 0;
+    for (const c of w.creatures) h += c.x * 1.0007 + c.y * 1.013 + c.heading * 7.7;
+    return h;
+  };
+
   for (let i = 0; i < 60 * 60; i++) {
     world.update(1 / 60);
     restored.update(1 / 60);
   }
   assert.equal(restored.food.length, world.food.length, "food counts stay in lock-step");
+  assert.equal(restored.creatures.length, world.creatures.length, "populations stay in lock-step");
+  assert.ok(close(checksum(restored), checksum(world), 1e-6), "creature motion stays bit-identical");
   assert.ok(close(restored.time, world.time), "clocks stay in lock-step");
 }
 
