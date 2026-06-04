@@ -6,7 +6,7 @@
 
 import { CONFIG } from "./config.js";
 import { randomGenome, mutate, crossover, genomeHue } from "./genome.js";
-import { wrapDelta } from "./math.js";
+import { wrapDelta, wrapDistSq } from "./math.js";
 import { weatherSenseFactor, windStrength, windDirection } from "./weather.js";
 import { SCENT } from "./scent.js";
 
@@ -300,8 +300,6 @@ export class Creature {
   reproduce(world, rng) {
     const c = CONFIG.creature;
     this.energy -= c.reproduceCost;
-    const childEnergy = this.energy * 0.5;
-    this.energy -= childEnergy;
 
     // Sexual vs. asexual reproduction is itself heritable, through the `mating`
     // gene. With probability `mating` the creature seeks a partner; if one is in
@@ -316,6 +314,25 @@ export class Creature {
     if (rng.chance(this.genome.mating)) {
       mate = world.findMate(this, c.mateRadius);
     }
+
+    // Courtship costs energy in proportion to how far the chosen mate is, so
+    // mate *choice* is no longer free: a picky breeder that reached past the
+    // nearest body for a better-hue-matched partner pays for the extra ground it
+    // courted across, while a neutral breeder (nearest mate) pays a pittance.
+    // Charged here — before the child's share is carved off below — so it
+    // genuinely shrinks what the pair invests in the offspring, and computed
+    // from positions alone (no rng), so a restored world replays bit-identically.
+    // The asexual / no-mate path pays nothing, exactly as before.
+    if (mate) {
+      const dist = Math.sqrt(
+        wrapDistSq(this.x, this.y, mate.x, mate.y, world.width, world.height),
+      );
+      this.energy -= c.courtshipCost * (dist / c.mateRadius);
+    }
+
+    const childEnergy = this.energy * 0.5;
+    this.energy -= childEnergy;
+
     const blended = mate ? crossover(this.genome, mate.genome, rng) : this.genome;
     const childGenome = mutate(blended, rng);
 

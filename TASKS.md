@@ -355,20 +355,45 @@ population dynamics, natural selection, and surprising behaviour.
       missing, and that the choice is wired through `reproduce` (an assortative
       breeder actually crosses with the far kin it picks, never the near stranger).
 
+- [x] Mate choice now *costs* something, so sexual selection carries a real
+      tension rather than a free preference. Before, a picky breeder reached past
+      the nearest body for a better-matched partner for free; now `Creature.reproduce`
+      charges a **courtship toll** scaled by how far the chosen mate is —
+      `creature.courtshipCost · (distance / mateRadius)` — drawn from the
+      initiator's energy *before* the child's half-share is carved off, so the
+      courtship genuinely shrinks what the pair invests in offspring. A neutral
+      breeder (`mateChoice` 0.5) takes the nearest body and pays a pittance; a
+      picky one that reaches across the lineage-hue axis for a far kin (or far
+      stranger) pays for the extra ground it courted, so `mateChoice` is now under
+      a cost gradient — homogamy and outbreeding are only worth it when the better
+      genetic match outweighs the energy spent reaching for it. The toll is capped
+      well under `reproduceCost` (so sex itself stays economical, it just taxes
+      *choosiness*), and the asexual / no-mate path pays nothing — exactly as
+      before, so every prior reproduce test is unchanged. Computed from positions
+      alone (`wrapDistSq`, no fresh rng), so a restored world still replays
+      bit-identically; no new gene and no serialized state, so `SAVE_VERSION` is
+      untouched. `test/courtship-cost.test.mjs` covers the formula (the exact
+      distance-scaled toll on parent and child energy at several distances), its
+      monotonicity in distance, that a picky assortative breeder pays strictly more
+      than a neutral one for the same layout (and exactly the far-kin toll), and
+      that the asexual path pays `reproduceCost` only.
+
 ## Next up
 
-- [ ] Make mate choice *cost* something, so sexual selection has a real tension
-      rather than a free preference. Right now a picky breeder pays nothing to
-      reach past the nearest body for a better-matched one. Options: a courtship
-      energy/time cost that scales with how far the chosen mate is (or how picky
-      the gene is), an explicit mate-search radius gene that trades reach against
-      metabolism, or letting the *chosen* partner also exercise a veto (mutual
-      choice) so a pairing needs both to agree. Or pick another seed below.
+- [ ] Speciation readout: assortative mate choice can now isolate clades and
+      courtship cost gives that isolation a price, but the only way to *see*
+      speciation is to squint at the lineage-hue colour bands. Track and surface
+      *how many* distinct lineage-hue clusters are breeding-isolated over time — a
+      species count in the HUD and/or a charts panel — so emergent speciation is
+      legible rather than only inferable. (One approach: cluster live creatures by
+      circular hue distance against `kinTolerance`, count clusters above a size
+      floor, and sample it into the existing `History` ring buffer like the other
+      trait series.) Or pick another seed below.
 
 ## Ideas / someday
 
 - Simple neural-net brains instead of hand-tuned genome weights.
-- Speciation readout: with assortative mate choice now able to isolate clades,
-  track and surface *how many* distinct lineage-hue clusters are breeding-isolated
-  over time (a species count in the HUD / a charts panel), so emergent speciation
-  is legible rather than only inferable from the colour bands.
+- Courtship as an explicit mate-search radius gene that trades reach against
+  metabolism, and/or mutual choice (the *chosen* partner also gets a veto, so a
+  pairing needs both to agree) — deeper variations on the courtship cost now that
+  it scales with distance.

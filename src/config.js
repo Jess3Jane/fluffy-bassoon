@@ -47,6 +47,17 @@ export const CONFIG = {
     // the hue term vanishes and the score is pure distance — i.e. nearest wins,
     // the old behaviour — regardless of this weight.
     mateChoiceDistWeight: 1.0,
+    // Courtship cost: sexual reproduction is no longer free to be *choosy*. When
+    // a breeder pairs with a partner, it pays this much energy scaled by how far
+    // that partner is (`courtshipCost · distance / mateRadius`) — full price for
+    // courting across the whole radius, almost nothing for a mate underfoot. A
+    // neutral breeder takes the nearest body and pays a pittance; a picky one
+    // that reaches past it for a better-hue-matched partner pays for the extra
+    // ground it courted across, so `mateChoice` now carries a real tension
+    // instead of a free preference. The asexual / no-mate path pays nothing,
+    // exactly as before. Kept well under `reproduceCost` so courtship taxes
+    // choice without making sex itself uneconomical.
+    courtshipCost: 30,
 
     maxAgeSeconds: 90, // soft cap; older creatures get a metabolism penalty
 

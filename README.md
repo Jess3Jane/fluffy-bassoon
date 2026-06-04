@@ -121,6 +121,17 @@ collapses back to nearest, the old behaviour. Where `mating` decides *whether* t
 mix genes, `mateChoice` decides *with whom*, and the HUD tracks where the
 population lands.
 
+Choosing is no longer free, though: sexual reproduction now pays a **courtship
+cost** scaled by how far the chosen partner is. A breeder taking the nearest body
+pays almost nothing, but one that reaches past it for a better-hue-matched mate
+pays for the extra ground it courts across, drawn from its energy before the
+child's share is set aside. So `mateChoice` sits under a real cost gradient —
+homogamy and outbreeding only pay off when the better genetic match outweighs the
+energy spent reaching for it — rather than being a preference exercised for free.
+The toll is kept well under the base cost of breeding, so it taxes choosiness
+without making sex itself uneconomical, and the asexual / no-mate path pays
+nothing.
+
 ## Run it
 
 It's a static site with no build step. Either open `index.html` through a local
