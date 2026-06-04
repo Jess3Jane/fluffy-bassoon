@@ -38,13 +38,39 @@ export class Creature {
     return CONFIG.creature.radius * this.genome.size;
   }
 
+  // Add energy, clamped to the species cap.
+  gain(amount) {
+    this.energy = Math.min(CONFIG.creature.maxEnergy, this.energy + amount);
+  }
+
+  // Whether this creature is physically able to prey on `other`: it must be
+  // carnivorous enough to bother and large enough to overpower it.
+  canEat(other) {
+    const c = CONFIG.creature;
+    return (
+      this.genome.diet > c.carnivoreThreshold &&
+      this.radius >= other.radius * c.predationSizeRatio
+    );
+  }
+
   // Advance one step. `dt` is in seconds. Returns a child Creature if the
   // creature reproduced this step, otherwise null.
   update(dt, world, rng) {
-    const g = this.genome;
+    // A creature eaten earlier this step is dead but still in the list; skip it.
+    if (!this.alive) return null;
 
-    // --- Sense: find the nearest food within sense radius. ---
-    const target = world.nearestFood(this.x, this.y, g.sense);
+    const g = this.genome;
+    const c = CONFIG.creature;
+    const wantsMeat = g.diet > c.carnivoreThreshold;
+
+    // --- Sense: look for the food source that best matches our diet. A
+    // herbivore-leaning creature still benefits from plants; a carnivore-leaning
+    // one hunts prey it can overpower. Carry the chosen target's position. ---
+    const plant = g.diet < 1 ? world.nearestFood(this.x, this.y, g.sense) : null;
+    const prey = wantsMeat ? world.nearestPrey(this, g.sense) : null;
+    let target = null;
+    if (prey && plant) target = g.diet >= 0.5 ? prey : plant;
+    else target = prey || plant;
 
     // --- Decide heading. ---
     let desired = this.heading;
@@ -70,19 +96,31 @@ export class Creature {
     this.x = wrap(this.x + Math.cos(this.heading) * dist, world.width);
     this.y = wrap(this.y + Math.sin(this.heading) * dist, world.height);
 
-    // --- Eat any food we're now touching. ---
-    const reach = this.radius + CONFIG.food.radius;
-    const eaten = world.consumeFoodNear(this.x, this.y, reach);
-    if (eaten > 0) {
-      this.energy = Math.min(
-        CONFIG.creature.maxEnergy,
-        this.energy + eaten * CONFIG.food.energy,
-      );
+    // --- Eat any plants we're now touching. Yield scales with how herbivorous
+    // we are, so committing to meat means getting little from greens. ---
+    if (g.diet < 1) {
+      const reach = this.radius + CONFIG.food.radius;
+      const eaten = world.consumeFoodNear(this.x, this.y, reach);
+      if (eaten > 0) {
+        this.gain(eaten * CONFIG.food.energy * (1 - g.diet));
+      }
+    }
+
+    // --- Hunt: if a creature we can overpower is in contact, kill and eat it.
+    // The payoff scales with our diet, so carnivory only pays if committed. ---
+    if (wantsMeat) {
+      const victim = world.preyInReach(this);
+      if (victim) {
+        victim.alive = false;
+        world.kills++;
+        this.gain(
+          g.diet * (victim.energy * c.meatEnergyEff + victim.radius * c.meatBodyEnergy),
+        );
+      }
     }
 
     // --- Metabolise. ---
     this.age += dt;
-    const c = CONFIG.creature;
     const sizeCost = g.size * g.size; // bigger bodies cost more to run
     let cost = c.baseMetabolism * g.metabolismEff * sizeCost;
     cost += dist * c.moveMetabolism * sizeCost;

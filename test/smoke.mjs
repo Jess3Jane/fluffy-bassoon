@@ -48,8 +48,11 @@ console.log("after 2 min:", {
   topGen: stats.generation,
   births: world.births,
   deaths: world.deaths,
+  kills: world.kills,
+  carnivores: stats.carnivores,
   avgSpeed: stats.avg.speed.toFixed(1),
   avgSense: stats.avg.sense.toFixed(0),
+  avgDiet: stats.avg.diet.toFixed(2),
 });
 
 // The ecosystem should actually be evolving: many births and deaths, and at
@@ -58,5 +61,13 @@ assert.ok(world.births > 50, `expected reproduction, got ${world.births} births`
 assert.ok(world.deaths > 50, `expected mortality, got ${world.deaths} deaths`);
 assert.ok(stats.generation >= 2, `expected lineages, top gen ${stats.generation}`);
 assert.ok(maxPop > 0, "population existed");
+
+// Predator/prey: a second trophic level should be active — creatures hunting
+// each other produces kills, and deaths should outpace pure starvation.
+assert.ok(world.kills > 0, `expected predation, got ${world.kills} kills`);
+assert.ok(
+  stats.avg.diet >= 0 && stats.avg.diet <= 1,
+  `avg diet in [0,1], got ${stats.avg.diet}`,
+);
 
 console.log("\nSMOKE TEST PASSED");

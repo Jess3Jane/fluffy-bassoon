@@ -64,15 +64,18 @@ function updateHud() {
   statsEl.innerHTML = [
     row("Population", s.population),
     row("Peak", s.peak),
+    row("Carnivores", s.carnivores),
     row("Food", s.food),
     row("Top gen", s.generation),
     row("Time", formatTime(s.time)),
     row("Avg energy", s.avgEnergy.toFixed(0)),
+    row("Kills", s.kills),
     divider(),
     row("Avg speed", s.avg.speed.toFixed(1)),
     row("Avg sense", s.avg.sense.toFixed(0)),
     row("Avg size", s.avg.size.toFixed(2)),
     row("Avg wander", s.avg.wander.toFixed(2)),
+    row("Avg diet", s.avg.diet.toFixed(2)),
   ].join("");
 }
 

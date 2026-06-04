@@ -17,6 +17,7 @@ export class World {
     this.time = 0;
     this.births = 0;
     this.deaths = 0;
+    this.kills = 0;
     this.peakPopulation = 0;
 
     this.seed();
@@ -48,6 +49,40 @@ export class World {
       if (d < bestD) {
         bestD = d;
         best = f;
+      }
+    }
+    return best;
+  }
+
+  // Nearest creature `predator` is able to eat, within `radius`, or null.
+  // Linear scan; relies on Creature.canEat for the size/diet rules.
+  nearestPrey(predator, radius) {
+    const r2 = radius * radius;
+    let best = null;
+    let bestD = r2;
+    for (const c of this.creatures) {
+      if (c === predator || !c.alive || !predator.canEat(c)) continue;
+      const d = wrapDistSq(predator.x, predator.y, c.x, c.y, this.width, this.height);
+      if (d < bestD) {
+        bestD = d;
+        best = c;
+      }
+    }
+    return best;
+  }
+
+  // Nearest catchable creature actually in contact with `predator`, or null.
+  // Contact means the two bodies overlap (sum of radii).
+  preyInReach(predator) {
+    let best = null;
+    let bestD = Infinity;
+    for (const c of this.creatures) {
+      if (c === predator || !c.alive || !predator.canEat(c)) continue;
+      const reach = predator.radius + c.radius;
+      const d = wrapDistSq(predator.x, predator.y, c.x, c.y, this.width, this.height);
+      if (d <= reach * reach && d < bestD) {
+        bestD = d;
+        best = c;
       }
     }
     return best;
@@ -104,15 +139,18 @@ export class World {
   // Aggregate stats for the HUD.
   stats() {
     const n = this.creatures.length;
-    const avg = { speed: 0, sense: 0, size: 0, wander: 0 };
+    const avg = { speed: 0, sense: 0, size: 0, wander: 0, diet: 0 };
     let maxGen = 0;
     let energy = 0;
+    let carnivores = 0;
     for (const c of this.creatures) {
       avg.speed += c.genome.speed;
       avg.sense += c.genome.sense;
       avg.size += c.genome.size;
       avg.wander += c.genome.wander;
+      avg.diet += c.genome.diet;
       energy += c.energy;
+      if (c.genome.diet > CONFIG.creature.carnivoreThreshold) carnivores++;
       if (c.generation > maxGen) maxGen = c.generation;
     }
     if (n > 0) {
@@ -126,6 +164,8 @@ export class World {
       generation: maxGen,
       peak: this.peakPopulation,
       avgEnergy: energy,
+      carnivores,
+      kills: this.kills,
       avg,
     };
   }

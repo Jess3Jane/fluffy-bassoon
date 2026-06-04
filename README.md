@@ -4,11 +4,18 @@ An evolving creature ecosystem that runs entirely in your browser — a complex
 simulated world where emergent complexity is the whole point.
 
 Hundreds of creatures roam a toroidal world looking for food. Each carries a
-small **genome** (speed, sense range, size, metabolism, wanderlust). Eating
-gives energy; moving and living spend it. When a creature has enough energy it
-splits in two, passing on a mutated copy of its genome. There is no fitness
-function — survival *is* the fitness function, so the population evolves on its
-own. Watch traits drift, populations boom and crash, and lineages deepen.
+small **genome** (speed, sense range, size, metabolism, wanderlust, and
+**diet**). Eating gives energy; moving and living spend it. When a creature has
+enough energy it splits in two, passing on a mutated copy of its genome. There
+is no fitness function — survival *is* the fitness function, so the population
+evolves on its own. Watch traits drift, populations boom and crash, and lineages
+deepen.
+
+The `diet` gene spans herbivore (green) to carnivore (red): herbivores graze
+plants, while carnivores hunt creatures they can out-size, gaining meat instead.
+Specialising at either end is more efficient than sitting in the middle, so a
+**second trophic level** emerges on its own — and the carnivore share rises and
+falls with the supply of prey.
 
 ## Run it
 
@@ -26,7 +33,8 @@ Or just use the deployed GitHub Pages site.
 
 - **Click** the world to drop a cluster of food.
 - **Pause / Resume**, **Reset**, and a **Speed** slider (1×–8×) in the HUD.
-- The HUD shows live population, food, top generation, and average traits.
+- The HUD shows live population, carnivore count, food, kills, top generation,
+  and average traits (including diet).
 
 ## Develop
 
