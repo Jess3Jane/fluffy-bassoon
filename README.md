@@ -31,7 +31,11 @@ Or just use the deployed GitHub Pages site.
 
 ## Controls
 
-- **Click** the world to drop a cluster of food.
+- **Click or drag** the world to paint with the active brush, chosen by the
+  **Tool** toggle: *Food* scatters clumps of plants along your stroke, *Creature*
+  seeds fresh random-genome founders. Drag to lay a continuous trail (food paints
+  densely, creatures are spaced out) and reshape the ecosystem by hand — drop a
+  feast to trigger a boom, or seed a new founder population to watch it evolve.
 - **Pause / Resume**, **Reset**, and a **Speed** slider (1×–8×) in the HUD.
 - **Save / Load** snapshot the world to this browser's localStorage and restore
   it later. Because the random-number generator's state is saved too, a loaded

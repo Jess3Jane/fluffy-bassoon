@@ -57,13 +57,25 @@ population dynamics, natural selection, and surprising behaviour.
       every call guarded so a disabled/full/corrupt store degrades to "no save"
       rather than crashing), wired to **Save** / **Load** HUD buttons.
 
+- [x] Interactive tools: click/drag to paint food or seed creatures. A
+      `ToolController` (`src/tools.js`) owns the canvas pointer interaction and
+      drives two brushes selectable from a HUD **Tool** toggle: *Food* scatters
+      clumps of plants, *Creature* drops fresh random-genome founders. Pointer
+      events (mouse or touch, with pointer capture) walk the drag in fixed
+      `step`-sized hops along the shortest toroidal path, dabbing at each — so a
+      fast flick still lays a continuous trail and a slow crawl doesn't pile
+      dabs on one spot (food paints densely, creatures spaced further apart).
+      The spawn primitives live on the world core (`World.spawnFood` now returns
+      the pellet / null at the food cap; `World.spawnCreature` adds a founder at
+      a point via `Creature.randomAt` and keeps the peak counter honest), so the
+      brush logic stays a thin DOM shim and the spawning is headlessly tested.
+
 ## Next up
 
-- [ ] Interactive tools: click to add food, drag to spawn creatures.
+- [ ] Day-night cycle affecting food growth.
 
 ## Ideas / someday
 
-- Day-night cycle affecting food growth.
 - Terrain (water, fertile, barren) influencing movement and food.
 - Simple neural-net brains instead of hand-tuned genome weights.
 - Sexual reproduction with genome crossover.

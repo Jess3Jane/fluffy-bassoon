@@ -41,6 +41,13 @@ export class Creature {
     return c;
   }
 
+  // Like `random`, but dropped at a specific point rather than anywhere in the
+  // world — used by the interactive "spawn creature" tool, which supplies the
+  // location the user clicked or dragged over.
+  static randomAt(world, x, y, rng) {
+    return new Creature(x, y, randomGenome(rng), rng);
+  }
+
   // A plain, JSON-safe snapshot of everything needed to recreate this creature.
   // Derived fields (hue, lineageHue, radius) are recomputed from the genome on
   // restore rather than stored. `alive` is omitted: only live creatures are

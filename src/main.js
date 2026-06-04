@@ -7,6 +7,7 @@ import { makeRng } from "./rng.js";
 import { History } from "./history.js";
 import { Charts } from "./charts.js";
 import { saveWorld, loadWorld, hasSavedWorld } from "./persistence.js";
+import { ToolController, TOOLS, TOOL_LABELS } from "./tools.js";
 
 const FIXED_DT = 1 / 60; // simulation step, seconds
 const MAX_FRAME = 0.1; // clamp huge gaps (e.g. tab was backgrounded)
@@ -177,15 +178,20 @@ speedInput.addEventListener("input", () => {
   speedLabel.textContent = speed + "×";
 });
 
-// Click to drop a small cluster of food.
-canvas.addEventListener("click", (e) => {
-  const { x, y } = renderer.screenToWorld(e.clientX, e.clientY);
-  if (x < 0 || y < 0 || x > world.width || y > world.height) return;
-  for (let i = 0; i < 14; i++) {
-    const a = Math.random() * Math.PI * 2;
-    const d = Math.random() * 30;
-    world.spawnFood(x + Math.cos(a) * d, y + Math.sin(a) * d);
-  }
+// Interactive editing: click or drag the world to paint food or seed creatures.
+// The tools read `world` through a getter since it's swapped on reset / load.
+const tools = new ToolController({
+  canvas,
+  renderer,
+  getWorld: () => world,
+});
+
+// Cycle the active brush (food ↔ creature), mirroring the colour toggle.
+const toolBtn = document.getElementById("tool");
+toolBtn.addEventListener("click", () => {
+  const i = TOOLS.indexOf(tools.tool);
+  tools.setTool(TOOLS[(i + 1) % TOOLS.length]);
+  toolBtn.textContent = "Tool: " + TOOL_LABELS[tools.tool];
 });
 
 // --- Boot ---
