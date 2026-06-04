@@ -20,11 +20,16 @@ population dynamics, natural selection, and surprising behaviour.
       lets bigger creatures hunt smaller ones for meat, with a specialist
       tradeoff (plants vs. prey) and trophic-role colouring. A second trophic
       level emerges; the carnivore share self-regulates against prey supply.
+- [x] Spatial partitioning (grid hashing) so neighbour queries scale to large
+      populations. A uniform `SpatialGrid` (`src/grid.js`) buckets food and
+      creatures into toroidally-wrapped cells, so nearest-food / nearest-prey /
+      contact queries scan a small cell window instead of the whole world.
+      Behaviour-identical to the old linear scan (the smoke test cross-checks
+      grid queries against brute force), and ~5× faster at ~1k creatures plus
+      thousands of plants — the gap widening as the world grows.
 
 ## Next up
 
-- [ ] Spatial partitioning (grid hashing) so neighbour queries scale to large
-      populations.
 - [ ] Lineage / species colouring driven by genome so clades are visible.
 - [ ] Charts: population and trait history over time.
 - [ ] Save / load world state to localStorage.

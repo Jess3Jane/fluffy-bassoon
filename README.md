@@ -43,7 +43,9 @@ npm test   # runs a headless simulation and checks ecosystem invariants
 ```
 
 Source lives in `src/` (pure simulation core + a canvas renderer). Tuning knobs
-are in `src/config.js`. The roadmap is in `TASKS.md`.
+are in `src/config.js`. The roadmap is in `TASKS.md`. Neighbour lookups go
+through a uniform spatial grid (`src/grid.js`) so the simulation stays cheap as
+populations grow into the thousands.
 
 ## Stack
 

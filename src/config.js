@@ -47,6 +47,14 @@ export const CONFIG = {
     meatBodyEnergy: 5,
   },
 
+  // Spatial hashing: the cell size used to bucket entities for neighbour
+  // queries. Roughly the typical query radius — small enough that few entities
+  // share a cell, large enough that a sense-radius query spans only a handful
+  // of cells.
+  spatial: {
+    cellSize: 70,
+  },
+
   // Mutation applied to each genome gene at birth.
   mutation: {
     rate: 0.9, // probability a child mutates at all

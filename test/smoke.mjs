@@ -9,6 +9,26 @@ import { makeRng } from "../src/rng.js";
 import { GENES } from "../src/genome.js";
 import { CONFIG } from "../src/config.js";
 
+// Brute-force nearest-food distance, the reference the spatial grid must match.
+function bruteNearestFoodDistSq(world, x, y, radius) {
+  let best = radius * radius;
+  for (const f of world.food) {
+    if (f.dead) continue;
+    const dx = wrapDelta(f.x - x, world.width);
+    const dy = wrapDelta(f.y - y, world.height);
+    const d = dx * dx + dy * dy;
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+function wrapDelta(d, size) {
+  const half = size / 2;
+  if (d > half) return d - size;
+  if (d < -half) return d + size;
+  return d;
+}
+
 const rng = makeRng(12345);
 const world = new World(rng);
 
@@ -69,5 +89,32 @@ assert.ok(
   stats.avg.diet >= 0 && stats.avg.diet <= 1,
   `avg diet in [0,1], got ${stats.avg.diet}`,
 );
+
+// Spatial grid correctness: the grid-backed nearestFood must agree with a
+// brute-force scan. Resync the grid to the current food, then sample a lattice
+// of query points across the world (including the wrapped edges).
+world.foodGrid.rebuild(world.food);
+const radius = CONFIG.creature.senseRadius;
+let checks = 0;
+for (let gx = 0; gx <= world.width; gx += world.width / 13) {
+  for (let gy = 0; gy <= world.height; gy += world.height / 11) {
+    const expectedSq = bruteNearestFoodDistSq(world, gx, gy, radius);
+    const hit = world.nearestFood(gx, gy, radius);
+    if (expectedSq < radius * radius) {
+      assert.ok(hit, `grid missed food the brute scan found at (${gx},${gy})`);
+      const dx = wrapDelta(hit.x - gx, world.width);
+      const dy = wrapDelta(hit.y - gy, world.height);
+      const gotSq = dx * dx + dy * dy;
+      assert.ok(
+        Math.abs(gotSq - expectedSq) < 1e-6,
+        `grid nearest ${gotSq} != brute ${expectedSq} at (${gx},${gy})`,
+      );
+    } else {
+      assert.ok(!hit, `grid found food the brute scan didn't at (${gx},${gy})`);
+    }
+    checks++;
+  }
+}
+console.log(`spatial grid matched brute force on ${checks} sample points`);
 
 console.log("\nSMOKE TEST PASSED");
