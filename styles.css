@@ -89,6 +89,13 @@ button {
 
 button:hover { background: rgba(111, 211, 199, 0.22); }
 
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+button:disabled:hover { background: rgba(111, 211, 199, 0.12); }
+
 .speed {
   display: flex;
   align-items: center;

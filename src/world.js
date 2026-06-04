@@ -4,7 +4,7 @@
 // every entity on every lookup.
 
 import { CONFIG } from "./config.js";
-import { Creature } from "./creature.js";
+import { Creature, reserveIds } from "./creature.js";
 import { SpatialGrid } from "./grid.js";
 import { GENES } from "./genome.js";
 import { wrapDistSq } from "./math.js";
@@ -12,8 +12,14 @@ import { wrapDistSq } from "./math.js";
 // Largest a creature's body can get, used to size contact-query windows.
 const MAX_CREATURE_RADIUS = CONFIG.creature.radius * GENES.size[1];
 
+// Bump when the serialized shape changes in a way old saves can't satisfy, so
+// stale data is rejected rather than loaded into a mismatched world.
+const SAVE_VERSION = 1;
+
 export class World {
-  constructor(rng) {
+  // `seed: false` builds an empty world (no starting food/creatures, rng
+  // untouched) — used when the contents are about to be loaded from a save.
+  constructor(rng, { seed = true } = {}) {
     this.rng = rng;
     this.width = CONFIG.world.width;
     this.height = CONFIG.world.height;
@@ -31,7 +37,7 @@ export class World {
     this.kills = 0;
     this.peakPopulation = 0;
 
-    this.seed();
+    if (seed) this.seed();
   }
 
   seed() {
@@ -198,5 +204,56 @@ export class World {
       kills: this.kills,
       avg,
     };
+  }
+
+  // A plain, JSON-safe snapshot of the whole world: the running counters, the
+  // rng state (so the resumed stream is identical), and every live entity.
+  // Food is stored as compact [x, y] pairs; the spatial grids are derived and
+  // rebuilt on the next update, so they aren't saved. Dead-but-not-yet-compacted
+  // entities are filtered out defensively.
+  serialize() {
+    return {
+      version: SAVE_VERSION,
+      width: this.width,
+      height: this.height,
+      time: this.time,
+      births: this.births,
+      deaths: this.deaths,
+      kills: this.kills,
+      peakPopulation: this.peakPopulation,
+      foodSpawnAccumulator: this.foodSpawnAccumulator,
+      rngState: this.rng.getState(),
+      food: this.food.filter((f) => !f.dead).map((f) => [f.x, f.y]),
+      creatures: this.creatures.filter((c) => c.alive).map((c) => c.serialize()),
+    };
+  }
+
+  // Rebuild a world from a `serialize()` snapshot, driven by `rng`. The rng's
+  // state is restored *last* — after creature construction has churned it — so
+  // the resumed simulation continues the exact saved random sequence. Throws on
+  // a version mismatch so the caller can fall back to a fresh world.
+  static deserialize(data, rng) {
+    if (data.version !== SAVE_VERSION) {
+      throw new Error(`unsupported save version ${data.version}`);
+    }
+    const world = new World(rng, { seed: false });
+    world.time = data.time;
+    world.births = data.births;
+    world.deaths = data.deaths;
+    world.kills = data.kills;
+    world.peakPopulation = data.peakPopulation;
+    world.foodSpawnAccumulator = data.foodSpawnAccumulator;
+
+    world.food = data.food.map(([x, y]) => ({ x, y }));
+
+    let maxId = 0;
+    world.creatures = data.creatures.map((s) => {
+      if (s.id > maxId) maxId = s.id;
+      return Creature.fromState(s, rng);
+    });
+    reserveIds(maxId);
+
+    rng.setState(data.rngState);
+    return world;
   }
 }

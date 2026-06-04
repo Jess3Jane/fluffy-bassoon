@@ -45,9 +45,20 @@ population dynamics, natural selection, and surprising behaviour.
       ranges onto a shared 0–1 axis), making booms, crashes, and the trait drift
       behind them legible without leaving the page.
 
+- [x] Save / load world state to localStorage. The whole world serializes to a
+      plain, JSON-safe snapshot (`World.serialize` / `World.deserialize` in
+      `src/world.js`, with per-entity `Creature.serialize` / `fromState`): the
+      running counters, every live creature and food pellet, *and the rng state*
+      — mulberry32's single uint32, now exposed via `rng.getState/setState`
+      (`src/rng.js`). Restoring the rng last makes a loaded world a true
+      continuation: it replays the exact random stream, so original and restored
+      worlds run forward bit-identically (the persistence test asserts this).
+      `src/persistence.js` is a defensive localStorage wrapper (versioned saves,
+      every call guarded so a disabled/full/corrupt store degrades to "no save"
+      rather than crashing), wired to **Save** / **Load** HUD buttons.
+
 ## Next up
 
-- [ ] Save / load world state to localStorage.
 - [ ] Interactive tools: click to add food, drag to spawn creatures.
 
 ## Ideas / someday

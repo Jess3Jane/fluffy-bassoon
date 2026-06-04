@@ -10,6 +10,12 @@ import { wrapDelta } from "./math.js";
 
 let NEXT_ID = 1;
 
+// After restoring a saved world, advance the id counter past every id that was
+// loaded so creatures born afterwards still get fresh, unique ids.
+export function reserveIds(throughId) {
+  if (throughId >= NEXT_ID) NEXT_ID = throughId + 1;
+}
+
 export class Creature {
   constructor(x, y, genome, rng) {
     this.id = NEXT_ID++;
@@ -32,6 +38,38 @@ export class Creature {
       randomGenome(rng),
       rng,
     );
+    return c;
+  }
+
+  // A plain, JSON-safe snapshot of everything needed to recreate this creature.
+  // Derived fields (hue, lineageHue, radius) are recomputed from the genome on
+  // restore rather than stored. `alive` is omitted: only live creatures are
+  // ever serialized.
+  serialize() {
+    return {
+      id: this.id,
+      x: this.x,
+      y: this.y,
+      genome: { ...this.genome },
+      heading: this.heading,
+      energy: this.energy,
+      age: this.age,
+      generation: this.generation,
+    };
+  }
+
+  // Rebuild a creature from a `serialize()` snapshot. The constructor consumes
+  // `rng` (for its default heading); that draw is harmless here because every
+  // saved field is then overwritten — and the world restores the rng to its
+  // saved state after all creatures are built, so the resumed stream is exact.
+  static fromState(state, rng) {
+    const c = new Creature(state.x, state.y, { ...state.genome }, rng);
+    c.id = state.id;
+    c.heading = state.heading;
+    c.energy = state.energy;
+    c.age = state.age;
+    c.generation = state.generation;
+    c.alive = true;
     return c;
   }
 

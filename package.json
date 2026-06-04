@@ -5,7 +5,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "node test/smoke.mjs && node test/history.test.mjs",
+    "test": "node test/smoke.mjs && node test/history.test.mjs && node test/persistence.test.mjs",
     "serve": "node --version >/dev/null && python3 -m http.server 8000"
   },
   "license": "MIT"

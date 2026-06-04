@@ -20,5 +20,14 @@ export function makeRng(seed = (Date.now() >>> 0)) {
   // True with probability p.
   rng.chance = (p) => rng() < p;
 
+  // Expose the generator's entire internal state (a single uint32 for
+  // mulberry32) so a world can be saved and later resumed with a bit-identical
+  // random stream. Restoring `setState` makes the simulation pick up exactly
+  // where it left off rather than diverging onto a fresh sequence.
+  rng.getState = () => a >>> 0;
+  rng.setState = (v) => {
+    a = v >>> 0;
+  };
+
   return rng;
 }
