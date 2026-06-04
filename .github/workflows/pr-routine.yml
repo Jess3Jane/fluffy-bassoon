@@ -1,0 +1,28 @@
+name: Fire Claude Code routine on PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  fire-routine:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Anthropic routine webhook
+        env:
+          CC_ROUTINE_URL: ${{ secrets.CC_ROUTINE_URL }}
+          CC_ROUTINE_TOKEN: ${{ secrets.CC_ROUTINE_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          payload=$(jq -n \
+            --arg text "Please take a look at pull request #${PR_NUMBER} (\"${PR_TITLE}\"): ${PR_URL}. Review the PR and share your feedback." \
+            '{text: $text}')
+
+          curl -sS -X POST "$CC_ROUTINE_URL" \
+            -H "Authorization: Bearer $CC_ROUTINE_TOKEN" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "anthropic-beta: experimental-cc-routine-2026-04-01" \
+            -H "Content-Type: application/json" \
+            -d "$payload"
