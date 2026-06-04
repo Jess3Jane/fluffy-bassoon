@@ -22,6 +22,14 @@ rhythm, and food regrows fast in the light but slowly in the dark. The larder �
 and the population that lives off it — breathes with the cycle, and the world
 visibly dims at night.
 
+Two slower rhythms ride over the day-night cycle. **Seasons** swing across a
+long "year" — rich summers, lean winters, with autumn cooling and spring warming
+between — while **weather** flickers faster on top, rain spells boosting food and
+droughts thinning it. Both are pure functions of the clock (so they survive a
+save/load intact), and together they scale food growth on a longer timescale, so
+the population rides broad boom-and-bust waves as well as the daily breathing. The
+scene washes cool-blue in rain and dry-warm in drought.
+
 The world is laid over a **terrain** map of grassland dotted with patches of
 water, fertile soil, and barren ground. Food springs up thickest on fertile
 soil, sparsely on barren ground, and never on water; creatures wade slowly
@@ -59,7 +67,8 @@ Or just use the deployed GitHub Pages site.
   bands and you can watch a lineage spread or wink out.
 - The HUD shows live population, carnivore count, food, kills, top generation,
   the current time of day (Day / Dusk / Night / Dawn with a daylight percentage),
-  and average traits (including diet).
+  the season (Summer / Autumn / Winter / Spring) and weather (Drought … Storm,
+  with the combined climate food percentage), and average traits (including diet).
 - Two **history charts** in the HUD trace the world over time: a population
   panel (total population with the carnivore sub-band) and an average-trait
   panel (diet plus speed/size normalised onto a shared 0–1 axis), so you can
