@@ -34,6 +34,7 @@ export class History {
       population: stats.population,
       carnivores: stats.carnivores,
       species: stats.species,
+      isolation: stats.isolation,
       food: stats.food,
       diet: stats.avg.diet,
       speed: stats.avg.speed,

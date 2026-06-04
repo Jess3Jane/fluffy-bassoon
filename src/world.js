@@ -32,7 +32,10 @@ const MAX_CREATURE_RADIUS = CONFIG.creature.radius * GENES.size[1];
 // for sexual reproduction (a pre-v6 genome lacks it, so its reproduction mode
 // would be undefined — better to reject the save than breed off a NaN); v7
 // added the `mateChoice` gene for assortative/disassortative mate choice (a
-// pre-v7 genome lacks it, so its preference would be undefined).
+// pre-v7 genome lacks it, so its preference would be undefined). The mating-
+// isolation ring added later is *not* a version bump: it's pure readout state an
+// older save can satisfy by simply loading empty, so it degrades gracefully
+// rather than rejecting the save (see `deserialize`).
 const SAVE_VERSION = 7;
 
 export class World {
@@ -66,6 +69,16 @@ export class World {
     // and die, smelled by others. Starts empty in every world (it's grown by
     // play, not seeded), and is restored from a save on load.
     this.scent = new ScentField(this.width, this.height);
+
+    // A rolling record of the last `matingWindow` sexual matings, one bit each:
+    // 1 if the pairing crossed a lineage (parents more than `kinTolerance` apart
+    // on the hue wheel), 0 if it stayed within one. Oldest → newest; capped to
+    // the window so it stays bounded. Drives the realised reproductive-isolation
+    // readout in `stats()`. Asexual (clone) reproduction lays nothing here — only
+    // a real two-parent cross is a "mating" in this sense. It's pure observation
+    // (it never feeds back into the rng or the dynamics), but it *is* accumulated
+    // state, so it serializes for a true continuation across save/load.
+    this.matingRing = [];
 
     if (seed) this.seed();
   }
@@ -267,6 +280,22 @@ export class World {
     return best;
   }
 
+  // Record one sexual mating for the reproductive-isolation readout. `cross` is
+  // true when the pairing bridged two lineages (the parents sat more than
+  // `kinTolerance` apart on the hue wheel), false when it stayed within one.
+  // `Creature.reproduce` calls this for every two-parent cross (never for the
+  // asexual clone path). The ring keeps only the last `matingWindow` events, so
+  // the read is a *recent* share rather than a since-the-dawn-of-time average —
+  // which is what makes a falling cross-lineage rate (speciation tightening)
+  // legible. Pure bookkeeping: it draws no rng and feeds nothing back into the
+  // simulation, so it never perturbs the deterministic stream.
+  recordMating(cross) {
+    this.matingRing.push(cross ? 1 : 0);
+    if (this.matingRing.length > CONFIG.speciation.matingWindow) {
+      this.matingRing.shift();
+    }
+  }
+
   // Mark food within `radius` of a point as eaten and return the count. The
   // food is flagged rather than spliced out immediately so the grid we're
   // iterating stays stable; eaten food is skipped by subsequent queries this
@@ -424,6 +453,16 @@ export class World {
       for (const k of Object.keys(avg)) avg[k] /= n;
       energy /= n;
     }
+    // Realised reproductive isolation over the recent-matings window: the share
+    // of sexual matings that stayed within a lineage. `crossShare` is the
+    // complement — the fraction that bridged two clades — and `isolation` is
+    // `1 − crossShare`, so it rises as breeding turns inward (assortative choice
+    // + courtship cost biting). Null until any sexual mating is on record, so the
+    // HUD can show "—" rather than a misleading 0 before sex even happens.
+    const matings = this.matingRing.length;
+    let cross = 0;
+    for (const v of this.matingRing) cross += v;
+    const isolation = matings > 0 ? 1 - cross / matings : null;
     return {
       population: n,
       food: this.food.length,
@@ -445,6 +484,9 @@ export class World {
         CONFIG.scent.kinTolerance,
         CONFIG.speciation.minClusterSize,
       ),
+      matings,
+      crossMatings: cross,
+      isolation,
       avg,
     };
   }
@@ -470,6 +512,7 @@ export class World {
       food: this.food.filter((f) => !f.dead).map((f) => [f.x, f.y]),
       creatures: this.creatures.filter((c) => c.alive).map((c) => c.serialize()),
       scent: this.scent.serialize(),
+      matingRing: this.matingRing.slice(),
     };
   }
 
@@ -496,6 +539,10 @@ export class World {
 
     world.food = data.food.map(([x, y]) => ({ x, y }));
     world.scent = ScentField.deserialize(data.scent, world.width, world.height);
+    // The isolation window is pure readout state, so an older save that predates
+    // it loads with an empty ring (the read just refills as breeding resumes)
+    // rather than being rejected — graceful degradation, no SAVE_VERSION bump.
+    world.matingRing = Array.isArray(data.matingRing) ? data.matingRing.slice() : [];
 
     let maxId = 0;
     world.creatures = data.creatures.map((s) => {

@@ -1,10 +1,12 @@
-// Tiny sparkline charts for the HUD, drawn straight to a canvas. Three stacked
+// Tiny sparkline charts for the HUD, drawn straight to a canvas. Four stacked
 // panels read out of a History ring: population over time (with the carnivore
 // sub-band), the average-trait drift (diet, plus speed/size normalised to their
-// gene ranges so they share a 0–1 axis), and the speciation count (how many
-// distinct lineage-hue clades are large enough to count). Together they make the
-// emergent story legible — booms and crashes, the selection pressure behind
-// them, and clades splitting apart — without leaving the page.
+// gene ranges so they share a 0–1 axis), the speciation count (how many distinct
+// lineage-hue clades are large enough to count), and realised reproductive
+// isolation (the within-lineage share of recent sexual matings). Together they
+// make the emergent story legible — booms and crashes, the selection pressure
+// behind them, clades splitting apart, and breeding actually turning inward as
+// they do — without leaving the page.
 
 import { normTrait } from "./history.js";
 
@@ -37,7 +39,7 @@ export class Charts {
     ctx.clearRect(0, 0, this.w, this.h);
 
     const s = history.samples;
-    const panelH = (this.h - GAP * 2) / 3;
+    const panelH = (this.h - GAP * 3) / 4;
 
     // Population & carnivores share an axis: carnivores are a subset of the
     // population, so plotting both against the population peak shows the
@@ -66,6 +68,16 @@ export class Charts {
     this.panel(2 * (panelH + GAP), panelH, "Species", String(spMax), [
       { color: "#b48ef0", fill: "rgba(180,142,240,0.14)", label: "clades",
         values: s.map((d) => (d.species || 0) / spMax) },
+    ]);
+
+    // Reproductive isolation: the within-lineage share of recent sexual matings,
+    // already a 0–1 quantity so it needs no scaling. It rises toward 1 as breeding
+    // turns inward (assortative choice + courtship cost biting) — the behavioural
+    // signature of speciation, alongside the structural clade count above. A null
+    // (no matings on record yet) plots at the floor via clamp01.
+    this.panel(3 * (panelH + GAP), panelH, "Isolation", "1.0", [
+      { color: "#5fd98a", fill: "rgba(95,217,138,0.14)", label: "within-lineage",
+        values: s.map((d) => (d.isolation == null ? 0 : d.isolation)) },
     ]);
   }
 
