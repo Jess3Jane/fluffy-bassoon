@@ -11,6 +11,7 @@ import { makeRng } from "../src/rng.js";
 import { Creature } from "../src/creature.js";
 import { CONFIG } from "../src/config.js";
 import { forageYield, randomGenome } from "../src/genome.js";
+import { kindYieldFactor } from "../src/plants.js";
 
 // --- forageYield: a matched specialist gets full value, the opposite specialism
 //     gets nothing, and the curve is convex so specialising out-yields hedging.
@@ -100,8 +101,8 @@ import { forageYield, randomGenome } from "../src/genome.js";
   const spec = world.forageNear(100, 100, 10, 0); // kind-0 specialist
   assert.equal(spec.count, 2, "the specialist ate only its two own-kind plants");
   assert.ok(
-    Math.abs(spec.gained - 2 * forageYield(0, 0)) < 1e-9,
-    "gained is the sum of per-plant forage yields",
+    Math.abs(spec.gained - 2 * forageYield(0, 0) * kindYieldFactor(0, world.time)) < 1e-9,
+    "gained is the sum of per-plant forage yields, scaled by the kind's current yield factor",
   );
   assert.ok(
     world.food.filter((f) => !f.dead).every((f) => f.kind === 1),

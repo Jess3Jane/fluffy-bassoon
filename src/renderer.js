@@ -3,6 +3,7 @@
 
 import { CONFIG } from "./config.js";
 import { daylight } from "./daycycle.js";
+import { kindRhythm } from "./plants.js";
 import { weatherNoise, windStrength, windDirection } from "./weather.js";
 import { TILE } from "./terrain.js";
 import { SCENT } from "./scent.js";
@@ -83,9 +84,15 @@ export class Renderer {
     // Food. The two plant kinds draw in distinct hues — leafy green for kind 0,
     // violet for kind 1 — so the spatial patchwork the resource axis partitions
     // along is visible at a glance, and which kind a clade has settled onto reads
-    // straight off where it forages. One pass per kind keeps the fill set cheap.
+    // straight off where it forages. Each kind is also faded by its day-night
+    // rhythm (`kindRhythm`): a sunleaf glows by day and dims at night, a moonleaf
+    // the reverse, so the shifting "which specialism pays now" reads on the field
+    // itself. One pass per kind keeps the fill set cheap.
     for (let kind = 0; kind < FOOD_COLORS.length; kind++) {
       ctx.fillStyle = FOOD_COLORS[kind];
+      // Map the rhythm (in [1 − rhythmDepth, 1]) onto a visible alpha band so an
+      // out-of-phase patch fades without vanishing.
+      ctx.globalAlpha = 0.4 + 0.6 * kindRhythm(kind, world.time);
       for (const f of world.food) {
         if ((f.kind === 1 ? 1 : 0) !== kind) continue;
         ctx.beginPath();
@@ -93,6 +100,7 @@ export class Renderer {
         ctx.fill();
       }
     }
+    ctx.globalAlpha = 1;
 
     // Creatures.
     for (const c of world.creatures) {

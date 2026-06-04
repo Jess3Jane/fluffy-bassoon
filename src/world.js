@@ -25,6 +25,7 @@ import {
 } from "./weather.js";
 import { Terrain } from "./terrain.js";
 import { ScentField } from "./scent.js";
+import { plantKindAt, kindYieldFactor } from "./plants.js";
 
 // Largest a creature's body can get, used to size contact-query windows.
 const MAX_CREATURE_RADIUS = CONFIG.creature.radius * GENES.size[1];
@@ -352,7 +353,12 @@ export class World {
       if (yield_ <= 0) return; // off-resource: leave it for the other ecotype
       f.dead = true;
       count++;
-      gained += yield_;
+      // Weight the energy by what this kind is worth *now*: its static richness
+      // and its day-night rhythm (`kindYieldFactor`). The specialism gate above
+      // is time-independent — a forager still eats its own kind at the lean hour
+      // — but a sunleaf at midnight (or a moonleaf at noon) pays far less, so the
+      // two kinds trade off against the clock instead of being interchangeable.
+      gained += yield_ * kindYieldFactor(f.kind, this.time);
     });
     return { count, gained };
   }
@@ -528,10 +534,15 @@ export class World {
     // pulling a forager clade toward it.
     const foodByKind = [0, 0];
     for (const f of this.food) foodByKind[f.kind === 1 ? 1 : 0]++;
+    // What each plant kind is worth *right now* — its richness × day-night
+    // rhythm — so the HUD can show which specialism the clock currently favours
+    // (a sunleaf peaking by day, a moonleaf by night) beside the standing split.
+    const kindYield = [kindYieldFactor(0, this.time), kindYieldFactor(1, this.time)];
     return {
       population: n,
       food: this.food.length,
       foodByKind,
+      kindYield,
       scent: this.scent.plumes.length,
       time: this.time,
       daylight: daylight(this.time),
@@ -626,14 +637,4 @@ export class World {
 // Wrap a coordinate into [0, size) on a toroidal axis.
 function wrap(v, size) {
   return ((v % size) + size) % size;
-}
-
-// Which of the two plant kinds (0 or 1) sprouts at a point. Two offset sine
-// bands carve the world into smooth ~quarter-size patches of each kind, so the
-// species grow in distinct regions — a spatial sub-resource axis a forager clade
-// can specialise on and follow into its own patches. A pure function of position
-// (drawing no rng), so it's both deterministic across save/load and free of any
-// perturbation to the simulation's random stream. The split is ~50/50 by area.
-function plantKindAt(x, y) {
-  return Math.sin(x * 0.012) + Math.sin(y * 0.016) > 0 ? 1 : 0;
 }
