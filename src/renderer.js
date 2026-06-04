@@ -3,7 +3,7 @@
 
 import { CONFIG } from "./config.js";
 import { daylight } from "./daycycle.js";
-import { weatherNoise } from "./weather.js";
+import { weatherNoise, windStrength, windDirection } from "./weather.js";
 import { TILE } from "./terrain.js";
 
 // Fill colours per tile kind, indexed by the TILE enum. Grass doubles as the
@@ -83,6 +83,11 @@ export class Renderer {
       this.drawCreature(ctx, c);
     }
 
+    // Wind: faint streaks raking across the scene along the prevailing bearing
+    // when a storm blows, so the coherent push that herds the population reads at
+    // a glance.
+    this.drawWind(ctx, world);
+
     // Night veil: a translucent dark-blue wash over the whole scene that
     // deepens as daylight fades, so the day-night cycle reads at a glance.
     const darkness = 1 - daylight(world.time);
@@ -126,6 +131,39 @@ export class Renderer {
     }
   }
 
+  // Faint wind streaks: short segments drifting along the prevailing bearing,
+  // animated by the wind clock and wrapped across the toroidal world. They only
+  // show once a storm stirs a real wind, fading in with its strength, so fair
+  // weather stays clear. Purely decorative — driven entirely by `world.time`, so
+  // it holds no state and reads the same at any playback speed.
+  drawWind(ctx, world) {
+    const strength = windStrength(world.time);
+    if (strength <= 0.05) return;
+    const dir = windDirection(world.time);
+    const cos = Math.cos(dir);
+    const sin = Math.sin(dir);
+    const len = 14 + strength * 26; // streaks lengthen as the gale builds
+    const travel = world.time * (40 + strength * 120); // drift along the wind
+    ctx.save();
+    ctx.strokeStyle = `rgba(222, 232, 246, ${Math.min(0.16, strength * 0.2).toFixed(3)})`;
+    ctx.lineWidth = 1 / this.scale;
+    ctx.beginPath();
+    for (let i = 0; i < 70; i++) {
+      // A fixed pseudo-random anchor per streak (cheap hash of the index),
+      // shifted downwind by `travel` and wrapped back into the world.
+      const hx = fract(Math.sin(i * 12.9898) * 43758.5453);
+      const hy = fract(Math.sin(i * 78.233) * 12543.6789);
+      let x = (hx * world.width + cos * travel) % world.width;
+      let y = (hy * world.height + sin * travel) % world.height;
+      if (x < 0) x += world.width;
+      if (y < 0) y += world.height;
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - cos * len, y - sin * len);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
   drawCreature(ctx, c) {
     const r = c.radius;
     // Energy drives brightness so starving creatures visibly fade.
@@ -157,4 +195,9 @@ export class Renderer {
 
     ctx.restore();
   }
+}
+
+// Fractional part in [0, 1), used to scatter wind-streak anchors from a hash.
+function fract(v) {
+  return v - Math.floor(v);
 }

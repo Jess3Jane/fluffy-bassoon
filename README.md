@@ -30,6 +30,16 @@ save/load intact), and together they scale food growth on a longer timescale, so
 the population rides broad boom-and-bust waves as well as the daily breathing. The
 scene washes cool-blue in rain and dry-warm in drought.
 
+Weather reaches past the larder into how creatures move. Rain dims sight (food
+grown in a downpour is harder to find), and storms raise a **wind** — not just a
+strength but a *direction*, a prevailing bearing that turns slowly around the
+compass. When a gale blows it pushes every heading the same way (a coherent shove
+that herds the whole population downwind, on top of the random gust jitter) and
+drifts loose food along the same bearing, so a storm rakes the larder across the
+world rather than only scattering it. Faint streaks rake the scene to show which
+way it's blowing. Drought is the calm, clear opposite — you see far and steer
+true, but go hungry.
+
 The world is laid over a **terrain** map of grassland dotted with patches of
 water, fertile soil, and barren ground. Food springs up thickest on fertile
 soil, sparsely on barren ground, and never on water; creatures wade slowly
@@ -67,8 +77,9 @@ Or just use the deployed GitHub Pages site.
   bands and you can watch a lineage spread or wink out.
 - The HUD shows live population, carnivore count, food, kills, top generation,
   the current time of day (Day / Dusk / Night / Dawn with a daylight percentage),
-  the season (Summer / Autumn / Winter / Spring) and weather (Drought … Storm,
-  with the combined climate food percentage), and average traits (including diet).
+  the season (Summer / Autumn / Winter / Spring), weather (Drought … Storm, with
+  the combined climate food percentage), the wind (Calm, or a compass bearing and
+  strength once a storm raises one), and average traits (including diet).
 - Two **history charts** in the HUD trace the world over time: a population
   panel (total population with the carnivore sub-band) and an average-trait
   panel (diet plus speed/size normalised onto a shared 0–1 axis), so you can

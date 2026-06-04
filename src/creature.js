@@ -7,7 +7,7 @@
 import { CONFIG } from "./config.js";
 import { randomGenome, mutate, genomeHue } from "./genome.js";
 import { wrapDelta } from "./math.js";
-import { weatherSenseFactor, windStrength } from "./weather.js";
+import { weatherSenseFactor, windStrength, windDirection } from "./weather.js";
 
 let NEXT_ID = 1;
 
@@ -140,12 +140,17 @@ export class Creature {
     // Wanderers don't commit fully even when they see food.
     this.heading += turn * (target ? 1 : 1 - 0.3 * g.wander);
 
-    // --- Storm buffeting: gusts knock the heading around in a storm, so even a
-    // creature locked onto food gets jostled off its line. The kick scales with
-    // the wind, so it's nothing in fair weather and fiercest at a storm's peak.
+    // --- Storm winds: a gust both pushes and jostles. The prevailing wind has a
+    // *direction*, so every creature is steered toward the same downwind bearing
+    // — a coherent push that herds the population one way rather than only
+    // scattering it — while random gusts knock the heading around on top, so even
+    // a creature locked onto food gets jostled off its line. Both scale with the
+    // wind, so they're nothing in fair weather and fiercest at a storm's peak.
     // (Drought is calm: its dry air leaves both sight and steering untouched.) ---
     const wind = windStrength(world.time);
     if (wind > 0) {
+      const toward = wrapAngle(windDirection(world.time) - this.heading);
+      this.heading += toward * Math.min(1, wind * CONFIG.weather.windPush * dt);
       this.heading += rng.normal() * wind * CONFIG.weather.windBuffet * dt;
     }
 

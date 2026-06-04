@@ -129,12 +129,33 @@ population dynamics, natural selection, and surprising behaviour.
       draws on the main rng, so it stays a true save/load continuation (the
       weather test's round-trip now checksums creature motion to prove it).
 
+- [x] Wind has a *direction*, not just a strength. A slowly turning prevailing
+      wind (`windDirection` in `src/weather.js`) sweeps one full turn around the
+      compass per `windTurnSeconds`, with a smooth value-noise wobble layered on
+      so the bearing meanders rather than sweeping evenly. Like the rest of the
+      weather layer it's a *pure function of `world.time`* — no serialized state,
+      bit-identical across save/load, identical at any speed. The direction
+      exists in all weather but only *bites* when a storm stirs a real wind, and
+      then it bites two ways: **creatures get a coherent push** (`Creature.update`
+      now steers every heading toward the same downwind bearing, scaled by
+      `windPush` × strength, *before* the existing random gust jitter — so a gale
+      herds the whole population one way instead of only scattering it), and
+      **food drifts downwind** (`World.update` nudges every pellet along the
+      bearing by `windFoodDrift` × strength, slowly raking the larder across the
+      world in the same direction). The buffet still draws on the main rng so it
+      stays a true save/load continuation, and the round-trip test's checksum now
+      covers food positions too, since the drift must replay identically. The
+      renderer rakes faint streaks across the scene along the bearing when the
+      wind blows, `stats()` surfaces the live `wind`/`windDir`, and the HUD shows
+      the wind as a compass point (Calm…NE) with its strength.
+
 ## Next up
 
-- [ ] Wind should have a *direction*, not just a strength — a slowly turning
-      prevailing wind that nudges every heading the same way (and could carry
-      drifting food/spores downwind), so storms herd the population rather than
-      only scattering it, and the buffet gains a coherent push under the gusts.
+- [ ] Wind should carry *scent* / pheromone trails, not just bodies — let
+      creatures lay a faint downwind-drifting marker (e.g. a "danger" plume when
+      hunted or a "food here" plume when feeding) that others can sense, so the
+      prevailing wind becomes an information channel and flocking/avoidance can
+      emerge from the same field that already herds and drifts everything.
 
 ## Ideas / someday
 

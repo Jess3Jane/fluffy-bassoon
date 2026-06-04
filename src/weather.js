@@ -130,6 +130,40 @@ export function windStrength(time) {
   return (wet - onset) / (1 - onset);
 }
 
+// The prevailing wind's *direction* (radians, in world space: 0 points along +x,
+// increasing clockwise as +y runs down the screen). Unlike the strength, the
+// bearing exists in all weather — it just only *bites* when the wind blows. It
+// turns steadily around the compass (one full turn per `windTurnSeconds`), with
+// a smooth value-noise wobble layered on so it meanders instead of sweeping at a
+// perfectly even rate. Pure in sim-time like the rest of the layer, so it adds
+// no saved state and replays identically. The returned angle is unbounded
+// (cos/sin consume it directly); use `windBearing` to fold it onto [0, 2π).
+export function windDirection(time) {
+  const turn = (2 * Math.PI * time) / CONFIG.weather.windTurnSeconds;
+  // Sample the wobble noise a few times per full turn so the bearing drifts off
+  // the steady sweep and back without ever jumping.
+  const wobble =
+    (valueNoise1((time * 4) / CONFIG.weather.windTurnSeconds + 50) - 0.5) *
+    2 *
+    CONFIG.weather.windWobble;
+  return turn + wobble;
+}
+
+// The wind bearing folded onto [0, 2π), for display.
+export function windBearing(time) {
+  const a = windDirection(time);
+  return ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+}
+
+// A compass label for the direction the wind blows *toward* (its push). With +x
+// east and +y south (screen-down), the eight points fall at 45° steps from due
+// east at bearing 0.
+const COMPASS = ["E", "SE", "S", "SW", "W", "NW", "N", "NE"];
+export function windLabel(time) {
+  const idx = Math.round(windBearing(time) / (Math.PI / 4)) % 8;
+  return COMPASS[idx];
+}
+
 // --- Combined ------------------------------------------------------------
 
 // The combined season × weather multiplier on food growth, floored so it never

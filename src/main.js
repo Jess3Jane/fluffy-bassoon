@@ -9,7 +9,7 @@ import { Charts } from "./charts.js";
 import { saveWorld, loadWorld, hasSavedWorld } from "./persistence.js";
 import { ToolController, TOOLS, TOOL_LABELS } from "./tools.js";
 import { phaseLabel } from "./daycycle.js";
-import { seasonLabel, weatherLabel } from "./weather.js";
+import { seasonLabel, weatherLabel, windStrength, windLabel } from "./weather.js";
 
 const FIXED_DT = 1 / 60; // simulation step, seconds
 const MAX_FRAME = 0.1; // clamp huge gaps (e.g. tab was backgrounded)
@@ -95,6 +95,7 @@ function updateHud() {
     row("Daylight", `${phaseLabel(s.time)} ${Math.round(s.daylight * 100)}%`),
     row("Season", seasonLabel(s.time)),
     row("Weather", `${weatherLabel(s.time)} ${Math.round(s.climateFood * 100)}%`),
+    row("Wind", windRow(s.time)),
     row("Avg energy", s.avgEnergy.toFixed(0)),
     row("Kills", s.kills),
     divider(),
@@ -118,6 +119,14 @@ function formatTime(sec) {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+// The wind reads as "Calm" until a storm actually stirs one up; once it blows,
+// show the compass bearing it pushes toward and its strength.
+function windRow(time) {
+  const w = windStrength(time);
+  if (w <= 0) return "Calm";
+  return `${windLabel(time)} ${Math.round(w * 100)}%`;
 }
 
 // --- Controls ---
