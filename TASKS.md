@@ -36,9 +36,17 @@ population dynamics, natural selection, and surprising behaviour.
       toggles the renderer between **Trophic** colouring (diet → green/red) and
       **Lineage** colouring (the clade marker).
 
+- [x] Charts: population and trait history over time. A `History` ring buffer
+      (`src/history.js`) samples `world.stats()` on a fixed *sim-time* cadence —
+      so the window reads identically at 1× or 8× — and evicts oldest-first to
+      stay bounded. `src/charts.js` draws two stacked sparklines in the HUD: a
+      population panel (total + carnivore sub-band, scaled to the windowed peak)
+      and an average-trait panel (diet, plus speed/size normalised to their gene
+      ranges onto a shared 0–1 axis), making booms, crashes, and the trait drift
+      behind them legible without leaving the page.
+
 ## Next up
 
-- [ ] Charts: population and trait history over time.
 - [ ] Save / load world state to localStorage.
 - [ ] Interactive tools: click to add food, drag to spawn creatures.
 
