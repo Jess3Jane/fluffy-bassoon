@@ -28,8 +28,10 @@ const MAX_CREATURE_RADIUS = CONFIG.creature.radius * GENES.size[1];
 // scent-signalling genes (a pre-v4 genome lacks them, so its behaviour would be
 // undefined — better to reject the save than load a NaN-steered creature); v5
 // added the `kinship` gene and a per-plume emitter hue (a pre-v5 genome lacks
-// kinship, and its plumes carry no hue to weight by).
-const SAVE_VERSION = 5;
+// kinship, and its plumes carry no hue to weight by); v6 added the `mating` gene
+// for sexual reproduction (a pre-v6 genome lacks it, so its reproduction mode
+// would be undefined — better to reject the save than breed off a NaN).
+const SAVE_VERSION = 6;
 
 export class World {
   // `seed: false` builds an empty world (no starting food/creatures, rng
@@ -222,6 +224,25 @@ export class World {
     return Math.min(1, kin / CONFIG.scent.kinDensityNorm);
   }
 
+  // Nearest other live creature within `radius` of `self`, or null — the partner
+  // for sexual reproduction. Any neighbour will do here: mate *choice* (by diet,
+  // size, or kinship) is a later layer; this just finds the closest body to
+  // recombine genomes with, falling back to null (→ asexual cloning) when the
+  // creature is alone. Uses the same creature grid as the predation queries.
+  findMate(self, radius) {
+    let best = null;
+    let bestD = radius * radius;
+    this.creatureGrid.forEachNear(self.x, self.y, radius, (c) => {
+      if (c === self || !c.alive) return;
+      const d = wrapDistSq(self.x, self.y, c.x, c.y, this.width, this.height);
+      if (d < bestD) {
+        bestD = d;
+        best = c;
+      }
+    });
+    return best;
+  }
+
   // Mark food within `radius` of a point as eaten and return the count. The
   // food is flagged rather than spliced out immediately so the grid we're
   // iterating stays stable; eaten food is skipped by subsequent queries this
@@ -350,6 +371,7 @@ export class World {
       foodTrust: 0,
       alarmTrust: 0,
       kinship: 0,
+      mating: 0,
     };
     let maxGen = 0;
     let energy = 0;
@@ -365,6 +387,7 @@ export class World {
       avg.foodTrust += c.genome.foodTrust;
       avg.alarmTrust += c.genome.alarmTrust;
       avg.kinship += c.genome.kinship;
+      avg.mating += c.genome.mating;
       energy += c.energy;
       if (c.genome.diet > CONFIG.creature.carnivoreThreshold) carnivores++;
       if (c.generation > maxGen) maxGen = c.generation;

@@ -288,13 +288,48 @@ population dynamics, natural selection, and surprising behaviour.
       filtered, radius-bounded crowd read, the always-caught lone victim, the
       floored crowded kill rate, and the monotone fall between).
 
+- [x] Sexual reproduction with genome crossover, so recombination — not just
+      mutation — drives adaptation, and the *mode* of reproduction is itself
+      under selection. A new heritable `mating` gene (`src/genome.js`, in `[0,1]`
+      so it mutates and clamps like any other) sets how readily a creature breeds
+      with a partner rather than cloning itself. In `Creature.reproduce` the
+      creature that hits the energy threshold rolls `rng.chance(mating)`: on a hit
+      it looks for a partner within `creature.mateRadius` (`World.findMate` — the
+      nearest live other creature off the existing creature grid, no new index),
+      and if one is in reach the child's genome is a **uniform crossover** of both
+      parents (`crossover` in `src/genome.js`: each gene inherited independently
+      from one parent or the other with equal chance, the neutral `lineageHue`
+      following the initiating "maternal" line so clade colouring stays coherent
+      as genes mix). The recombined genome is then run through the *same* `mutate`
+      as before, so mutation rides on top of crossover. With a low `mating` — or
+      simply nobody in reach — it falls back to the old asexual path (a mutated
+      clone), so sex never stalls breeding for want of a mate; it only happens
+      where there's someone to mix with, which ties it to the same clustering the
+      scent/kin/herding layers already drive (so no dedicated mate-seeking is
+      needed for a first cut). Only the initiator pays the energy cost (it's the
+      one that crossed the threshold); the partner just contributes genes, which
+      keeps the carefully-tuned energy economy untouched. A child's generation is
+      one past the *older* of its two parents. The mode roll and crossover draw on
+      the main rng, so a restored world replays bit-identically; the `mating` gene
+      rides the existing genome serialization (`SAVE_VERSION` bumped to 6 so a
+      pre-`mating` save is rejected rather than bred off a NaN). `stats()` averages
+      `mating` and the HUD shows a **Mating** row, so the population's drift toward
+      sex or cloning is legible. `test/sexual.test.mjs` covers the gene, the
+      crossover (per-gene parentage, that it mixes both parents, hue from parent
+      a), `findMate` (nearest / radius / self / dead exclusions), and the wired
+      reproduce paths (clone at mating 0 even beside a partner, a real cross at
+      mating 1 with a mate, the solo fallback to cloning, and generation bumps).
+
 ## Next up
 
-- [ ] Figure out the logical next step (see Ideas / someday below for seeds —
-      neural-net brains or sexual reproduction with crossover are the two big
-      ones), or break one of those into smaller tasks.
+- [ ] Mate *choice*, the natural follow-up to sexual reproduction: right now a
+      breeder pairs with whoever's nearest. Let selection shape *who* it pairs
+      with — e.g. reuse the `kinship` gene / lineage hue for assortative mating
+      (prefer kin, or avoid close inbreeding), or pick by diet/size — so sexual
+      selection and speciation have a lever. Or pick another seed below.
 
 ## Ideas / someday
 
 - Simple neural-net brains instead of hand-tuned genome weights.
-- Sexual reproduction with genome crossover.
+- Mate choice / sexual selection: assortative mating or inbreeding avoidance
+  layered over the crossover already in place.

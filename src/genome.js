@@ -37,6 +37,18 @@ export const GENES = {
   // relatives (sharing your `foodVoice`), the call pays off through inclusive
   // fitness rather than being pure altruism that erodes to silence.
   kinship: [0.0, 1.0], // how strongly scent response is weighted toward kin
+
+  // Sexual reproduction: how readily the creature reproduces with a partner
+  // (recombining two genomes) rather than cloning itself. At 0 it always splits
+  // asexually — a mutated copy of itself, the old behaviour; at 1 it always
+  // seeks a mate when ready and, if one is in reach, the child is a crossover of
+  // both parents. The mode is heritable so selection decides whether mixing
+  // genes (which can pull good traits from separate lineages into one body, and
+  // shed bad ones, far faster than mutation alone) beats faithful cloning — and
+  // because a creature with no partner nearby falls back to cloning, sex never
+  // stalls reproduction outright; it only happens where there's someone to mix
+  // with, so it co-evolves with the same clustering the scent/kin layers drive.
+  mating: [0.0, 1.0], // readiness to reproduce sexually (vs. clone) when able
 };
 
 export function randomGenome(rng) {
@@ -68,6 +80,25 @@ export function mutate(genome, rng) {
   child.lineageHue = wrapHue(
     genome.lineageHue + rng.normal() * CONFIG.mutation.lineageDrift,
   );
+  return child;
+}
+
+// Sexual reproduction: recombine two parent genomes into a child's. Each gene is
+// inherited independently from one parent or the other with equal chance (uniform
+// crossover), so a child is a fresh shuffle of its parents' traits rather than a
+// near-copy of one — recombination that can pull good genes from separate
+// lineages into one body (and shed bad ones) far faster than mutation alone. The
+// neutral `lineageHue` marker follows the first parent `a` (the one that
+// initiated reproduction — a maternal line), so clade colouring stays coherent
+// even as genes mix across lineages. The result is unmutated: callers run it
+// through `mutate`, exactly as the asexual (clone) path does, to add the per-gene
+// mutation and hue drift.
+export function crossover(a, b, rng) {
+  const child = {};
+  for (const name of Object.keys(GENES)) {
+    child[name] = rng.chance(0.5) ? a[name] : b[name];
+  }
+  child.lineageHue = a.lineageHue;
   return child;
 }
 

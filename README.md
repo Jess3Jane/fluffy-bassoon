@@ -94,6 +94,18 @@ animal out of one rather than starving against an uncatchable flock. That gives
 flocking an emergent anti-predator value on top of the scent payoff, a second
 reason for the population to bunch up.
 
+Reproduction itself now evolves, through **sexual reproduction with crossover**.
+A heritable `mating` trait sets how readily a creature breeds with a partner
+instead of cloning itself. When a creature ready to breed rolls to mate, it looks
+for the nearest neighbour in reach; if one is there, the child's genome is a
+uniform shuffle of both parents' genes (recombination, which can pull good traits
+from separate lineages into one body far faster than mutation alone), with
+mutation layered on top as before. With a low `mating` — or nobody nearby — it
+falls back to cloning, so breeding never stalls for want of a mate; sex happens
+only where the scent/kin/herding layers have already drawn creatures together.
+Whether a lineage drifts toward mixing or faithful cloning is left to selection,
+with `mating` tracked in the HUD.
+
 ## Run it
 
 It's a static site with no build step. Either open `index.html` through a local
@@ -128,8 +140,8 @@ Or just use the deployed GitHub Pages site.
   the combined climate food percentage), the wind (Calm, or a compass bearing and
   strength once a storm raises one), the live scent-plume count, and average
   traits — including diet, the four heritable signalling traits (food/alarm
-  voice and trust), and `kinship` (how strongly the creature filters scent by
-  the caller's lineage).
+  voice and trust), `kinship` (how strongly the creature filters scent by the
+  caller's lineage), and `mating` (how readily it breeds sexually vs. clones).
 - Two **history charts** in the HUD trace the world over time: a population
   panel (total population with the carnivore sub-band) and an average-trait
   panel (diet plus speed/size normalised onto a shared 0–1 axis), so you can
