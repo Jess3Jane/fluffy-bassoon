@@ -33,6 +33,10 @@ Or just use the deployed GitHub Pages site.
 
 - **Click** the world to drop a cluster of food.
 - **Pause / Resume**, **Reset**, and a **Speed** slider (1×–8×) in the HUD.
+- **Save / Load** snapshot the world to this browser's localStorage and restore
+  it later. Because the random-number generator's state is saved too, a loaded
+  world is an exact continuation — it picks up the same evolutionary trajectory
+  rather than starting a fresh one.
 - A **Colour** toggle switches creature colouring between *Trophic* (diet →
   green herbivore / red carnivore) and *Lineage*: each genome carries a neutral
   hue that descends with a slight drift, so clades show up as distinct colour

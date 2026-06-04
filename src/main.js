@@ -6,6 +6,7 @@ import { Creature } from "./creature.js";
 import { makeRng } from "./rng.js";
 import { History } from "./history.js";
 import { Charts } from "./charts.js";
+import { saveWorld, loadWorld, hasSavedWorld } from "./persistence.js";
 
 const FIXED_DT = 1 / 60; // simulation step, seconds
 const MAX_FRAME = 0.1; // clamp huge gaps (e.g. tab was backgrounded)
@@ -21,11 +22,17 @@ let paused = false;
 let accumulator = 0;
 let lastTime = performance.now();
 
-function reset() {
-  world = new World(makeRng());
+// Adopt a freshly built or restored world: swap it in, start a clean chart
+// history, and reset the loop's timing so we don't fast-forward the new world.
+function adopt(newWorld) {
+  world = newWorld;
   history = new History();
   accumulator = 0;
   lastTime = performance.now();
+}
+
+function reset() {
+  adopt(new World(makeRng()));
 }
 
 function loop(now) {
@@ -115,6 +122,43 @@ document.getElementById("pause").addEventListener("click", (e) => {
 });
 
 document.getElementById("reset").addEventListener("click", () => reset());
+
+// Save / load the world to this browser's localStorage. Buttons flash a brief
+// confirmation, and Load stays disabled whenever there's nothing saved.
+const saveBtn = document.getElementById("save");
+const loadBtn = document.getElementById("load");
+
+function refreshLoadButton() {
+  loadBtn.disabled = !hasSavedWorld();
+}
+
+function flash(btn, text) {
+  const original = btn.dataset.label ?? btn.textContent;
+  btn.dataset.label = original;
+  btn.textContent = text;
+  clearTimeout(btn._flashTimer);
+  btn._flashTimer = setTimeout(() => {
+    btn.textContent = btn.dataset.label;
+  }, 1000);
+}
+
+saveBtn.addEventListener("click", () => {
+  const ok = saveWorld(world);
+  flash(saveBtn, ok ? "Saved!" : "Failed");
+  refreshLoadButton();
+});
+
+loadBtn.addEventListener("click", () => {
+  const restored = loadWorld(makeRng());
+  if (restored) {
+    adopt(restored);
+    flash(loadBtn, "Loaded!");
+  } else {
+    flash(loadBtn, "No save");
+  }
+});
+
+refreshLoadButton();
 
 // Cycle the creature colouring between trophic role and lineage clade.
 const colourBtn = document.getElementById("colour");
