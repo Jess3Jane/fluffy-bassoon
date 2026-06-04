@@ -39,6 +39,11 @@ Or just use the deployed GitHub Pages site.
   bands and you can watch a lineage spread or wink out.
 - The HUD shows live population, carnivore count, food, kills, top generation,
   and average traits (including diet).
+- Two **history charts** in the HUD trace the world over time: a population
+  panel (total population with the carnivore sub-band) and an average-trait
+  panel (diet plus speed/size normalised onto a shared 0–1 axis), so you can
+  watch booms, crashes, and trait drift unfold. History is sampled on sim-time,
+  so the window reads the same whatever the speed setting.
 
 ## Develop
 

@@ -4,14 +4,18 @@ import { World } from "./world.js";
 import { Renderer } from "./renderer.js";
 import { Creature } from "./creature.js";
 import { makeRng } from "./rng.js";
+import { History } from "./history.js";
+import { Charts } from "./charts.js";
 
 const FIXED_DT = 1 / 60; // simulation step, seconds
 const MAX_FRAME = 0.1; // clamp huge gaps (e.g. tab was backgrounded)
 
 const canvas = document.getElementById("world");
 const renderer = new Renderer(canvas);
+const charts = new Charts(document.getElementById("charts"));
 
 let world;
+let history;
 let speed = 1;
 let paused = false;
 let accumulator = 0;
@@ -19,6 +23,7 @@ let lastTime = performance.now();
 
 function reset() {
   world = new World(makeRng());
+  history = new History();
   accumulator = 0;
   lastTime = performance.now();
 }
@@ -34,6 +39,9 @@ function loop(now) {
     let guard = 0;
     while (accumulator >= FIXED_DT && guard < 600) {
       for (let s = 0; s < speed; s++) world.update(FIXED_DT);
+      // Feed the history sampler the sim-time actually advanced this tick, so
+      // the charts span a consistent slice of world time at any speed.
+      history.tick(FIXED_DT * speed, () => world.stats());
       accumulator -= FIXED_DT;
       guard++;
     }
@@ -49,7 +57,13 @@ function loop(now) {
 
   renderer.draw(world);
   updateHud();
+  drawCharts();
   requestAnimationFrame(loop);
+}
+
+let chartThrottle = 0;
+function drawCharts() {
+  if (chartThrottle++ % 20 === 0) charts.draw(history); // ~3 redraws/sec
 }
 
 // --- HUD ---
