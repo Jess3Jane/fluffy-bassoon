@@ -17,14 +17,15 @@ import {
   windDirection,
 } from "./weather.js";
 import { Terrain } from "./terrain.js";
+import { ScentField } from "./scent.js";
 
 // Largest a creature's body can get, used to size contact-query windows.
 const MAX_CREATURE_RADIUS = CONFIG.creature.radius * GENES.size[1];
 
 // Bump when the serialized shape changes in a way old saves can't satisfy, so
 // stale data is rejected rather than loaded into a mismatched world. v2 added
-// the terrain seed.
-const SAVE_VERSION = 2;
+// the terrain seed; v3 added the scent / pheromone field.
+const SAVE_VERSION = 3;
 
 export class World {
   // `seed: false` builds an empty world (no starting food/creatures, rng
@@ -52,6 +53,11 @@ export class World {
     // never hit null, which `deserialize` then replaces with the saved seed's.
     this.terrainSeed = 0;
     this.terrain = new Terrain(this.width, this.height, this.terrainSeed);
+
+    // The scent / pheromone field: drifting plumes creatures lay as they feed
+    // and die, smelled by others. Starts empty in every world (it's grown by
+    // play, not seeded), and is restored from a save on load.
+    this.scent = new ScentField(this.width, this.height);
 
     if (seed) this.seed();
   }
@@ -207,22 +213,33 @@ export class World {
       this.foodSpawnAccumulator -= 1;
     }
 
-    // Storm winds carry loose food/spores downwind: while a gale blows, every
-    // pellet drifts a little along the prevailing bearing, so a storm slowly
-    // rakes the larder across the world in the same direction it herds the
-    // creatures. Pure in sim-time (the drift is a function of the wind clock and
-    // the pellet's own position), so it replays bit-identically across save/load.
+    // Storm winds carry loose food/spores — and the scent on the air — downwind:
+    // while a gale blows, every pellet drifts a little along the prevailing
+    // bearing (and every plume drifts further, being airborne), so a storm slowly
+    // rakes the larder across the world and smears scent into downwind trails, in
+    // the same direction it herds the creatures. Deterministic in sim-time + the
+    // entity's own position, so it replays bit-identically across save/load.
     const wind = windStrength(this.time);
     if (wind > 0) {
       const dir = windDirection(this.time);
+      const cos = Math.cos(dir);
+      const sin = Math.sin(dir);
       const step = wind * CONFIG.weather.windFoodDrift * dt;
-      const dx = Math.cos(dir) * step;
-      const dy = Math.sin(dir) * step;
+      const dx = cos * step;
+      const dy = sin * step;
       for (const f of this.food) {
         f.x = wrap(f.x + dx, this.width);
         f.y = wrap(f.y + dy, this.height);
       }
+      const scentStep = wind * CONFIG.scent.drift * dt;
+      this.scent.drift(cos * scentStep, sin * scentStep);
     }
+
+    // Fade the scent field and forget spent plumes, then index it so this step's
+    // creatures can smell the field as it stands now. Plumes laid during the loop
+    // below join the index next step.
+    this.scent.decay(dt);
+    this.scent.rebuild();
 
     // (Re)build the spatial indices from the current entities so this step's
     // neighbour queries are cheap. Creatures move during the loop below, but
@@ -286,6 +303,7 @@ export class World {
     return {
       population: n,
       food: this.food.length,
+      scent: this.scent.plumes.length,
       time: this.time,
       daylight: daylight(this.time),
       season: seasonLevel(this.time),
@@ -322,6 +340,7 @@ export class World {
       rngState: this.rng.getState(),
       food: this.food.filter((f) => !f.dead).map((f) => [f.x, f.y]),
       creatures: this.creatures.filter((c) => c.alive).map((c) => c.serialize()),
+      scent: this.scent.serialize(),
     };
   }
 
@@ -347,6 +366,7 @@ export class World {
     world.terrain = new Terrain(world.width, world.height, world.terrainSeed);
 
     world.food = data.food.map(([x, y]) => ({ x, y }));
+    world.scent = ScentField.deserialize(data.scent, world.width, world.height);
 
     let maxId = 0;
     world.creatures = data.creatures.map((s) => {

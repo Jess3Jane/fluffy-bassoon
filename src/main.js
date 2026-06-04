@@ -90,6 +90,7 @@ function updateHud() {
     row("Peak", s.peak),
     row("Carnivores", s.carnivores),
     row("Food", s.food),
+    row("Scent", s.scent),
     row("Top gen", s.generation),
     row("Time", formatTime(s.time)),
     row("Daylight", `${phaseLabel(s.time)} ${Math.round(s.daylight * 100)}%`),

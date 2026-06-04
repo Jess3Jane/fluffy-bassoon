@@ -149,13 +149,36 @@ population dynamics, natural selection, and surprising behaviour.
       wind blows, `stats()` surfaces the live `wind`/`windDir`, and the HUD shows
       the wind as a compass point (Calm…NE) with its strength.
 
+- [x] Wind carries *scent* / pheromone trails, not just bodies. A drifting
+      chemical field (`src/scent.js`, a `ScentField` owning the plumes plus their
+      own `SpatialGrid`) turns the prevailing wind into an information channel.
+      Creatures lay faint plumes as they live — a **food** plume when feeding and
+      a strong **danger** (blood) plume where one is killed — and others *smell*
+      the field at their full `sense`-gene reach, undimmed by rain (smell carries
+      when sight fails, so it complements the weather-fogged eye). The field reads
+      back as a steering nudge whose sign depends on diet: **food** scent draws
+      grazers (weighted by herbivory), while **danger** scent splits the world —
+      a herbivore flees the blood while a carnivore homes in on it, the same
+      death-marker repelling prey and summoning predators on one field. Plumes
+      ride the same storm wind that drifts food (faster, being airborne — so a
+      gale smears them into downwind trails), fade linearly until forgotten, and
+      are capped so a busy world stays bounded. Unlike the pure-in-time weather
+      layer this is *real state* (it depends on what creatures did), so it
+      serializes into the save (`SAVE_VERSION` bumped to 3); but emission, drift,
+      and decay draw no fresh rng, so a restored field replays bit-identically
+      (the scent test round-trips a checksum over every plume). The renderer
+      paints plumes as soft green/red hazes under the food, `stats()` surfaces the
+      live plume count, and the HUD shows a **Scent** row.
+
 ## Next up
 
-- [ ] Wind should carry *scent* / pheromone trails, not just bodies — let
-      creatures lay a faint downwind-drifting marker (e.g. a "danger" plume when
-      hunted or a "food here" plume when feeding) that others can sense, so the
-      prevailing wind becomes an information channel and flocking/avoidance can
-      emerge from the same field that already herds and drifts everything.
+- [ ] Make scent *signalling* heritable, so it evolves under selection rather
+      than being a fixed reflex. Add genome genes for how strongly a creature
+      emits each plume (a "loudness") and how strongly it responds to each
+      (a "trust"), with emission carrying a small energy cost — so the field
+      becomes an arena for honest signalling, eavesdropping, silence, and even
+      deceptive "danger" calls that scatter competitors, all emerging from the
+      same plume field the wind already carries.
 
 ## Ideas / someday
 
