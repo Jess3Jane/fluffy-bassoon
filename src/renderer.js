@@ -11,6 +11,9 @@ export class Renderer {
     this.scale = 1;
     this.offsetX = 0;
     this.offsetY = 0;
+    // "trophic" colours by diet (green herbivore → red carnivore); "lineage"
+    // colours by the heritable lineage marker so clades show as colour bands.
+    this.colorMode = "trophic";
     this.resize();
     window.addEventListener("resize", () => this.resize());
   }
@@ -79,19 +82,20 @@ export class Renderer {
       Math.min(1, c.energy / CONFIG.creature.maxEnergy),
     );
     const light = Math.round(35 + energyFrac * 35);
+    const hue = this.colorMode === "lineage" ? c.lineageHue : c.hue;
 
     ctx.save();
     ctx.translate(c.x, c.y);
     ctx.rotate(c.heading);
 
     // Body.
-    ctx.fillStyle = `hsl(${c.hue}, 65%, ${light}%)`;
+    ctx.fillStyle = `hsl(${hue}, 65%, ${light}%)`;
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, Math.PI * 2);
     ctx.fill();
 
     // Heading indicator.
-    ctx.fillStyle = `hsl(${c.hue}, 80%, ${light + 18}%)`;
+    ctx.fillStyle = `hsl(${hue}, 80%, ${light + 18}%)`;
     ctx.beginPath();
     ctx.moveTo(r * 0.4, 0);
     ctx.lineTo(r * 1.6, 0);

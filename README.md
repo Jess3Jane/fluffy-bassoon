@@ -33,6 +33,10 @@ Or just use the deployed GitHub Pages site.
 
 - **Click** the world to drop a cluster of food.
 - **Pause / Resume**, **Reset**, and a **Speed** slider (1×–8×) in the HUD.
+- A **Colour** toggle switches creature colouring between *Trophic* (diet →
+  green herbivore / red carnivore) and *Lineage*: each genome carries a neutral
+  hue that descends with a slight drift, so clades show up as distinct colour
+  bands and you can watch a lineage spread or wink out.
 - The HUD shows live population, carnivore count, food, kills, top generation,
   and average traits (including diet).
 

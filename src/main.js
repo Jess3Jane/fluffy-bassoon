@@ -102,6 +102,16 @@ document.getElementById("pause").addEventListener("click", (e) => {
 
 document.getElementById("reset").addEventListener("click", () => reset());
 
+// Cycle the creature colouring between trophic role and lineage clade.
+const colourBtn = document.getElementById("colour");
+const COLOUR_MODES = ["trophic", "lineage"];
+const COLOUR_LABELS = { trophic: "Trophic", lineage: "Lineage" };
+colourBtn.addEventListener("click", () => {
+  const i = COLOUR_MODES.indexOf(renderer.colorMode);
+  renderer.colorMode = COLOUR_MODES[(i + 1) % COLOUR_MODES.length];
+  colourBtn.textContent = "Colour: " + COLOUR_LABELS[renderer.colorMode];
+});
+
 const speedInput = document.getElementById("speed");
 const speedLabel = document.getElementById("speed-label");
 speedInput.addEventListener("input", () => {
