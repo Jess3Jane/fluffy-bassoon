@@ -30,8 +30,10 @@ const MAX_CREATURE_RADIUS = CONFIG.creature.radius * GENES.size[1];
 // added the `kinship` gene and a per-plume emitter hue (a pre-v5 genome lacks
 // kinship, and its plumes carry no hue to weight by); v6 added the `mating` gene
 // for sexual reproduction (a pre-v6 genome lacks it, so its reproduction mode
-// would be undefined — better to reject the save than breed off a NaN).
-const SAVE_VERSION = 6;
+// would be undefined — better to reject the save than breed off a NaN); v7
+// added the `mateChoice` gene for assortative/disassortative mate choice (a
+// pre-v7 genome lacks it, so its preference would be undefined).
+const SAVE_VERSION = 7;
 
 export class World {
   // `seed: false` builds an empty world (no starting food/creatures, rng
@@ -224,19 +226,41 @@ export class World {
     return Math.min(1, kin / CONFIG.scent.kinDensityNorm);
   }
 
-  // Nearest other live creature within `radius` of `self`, or null — the partner
-  // for sexual reproduction. Any neighbour will do here: mate *choice* (by diet,
-  // size, or kinship) is a later layer; this just finds the closest body to
-  // recombine genomes with, falling back to null (→ asexual cloning) when the
-  // creature is alone. Uses the same creature grid as the predation queries.
+  // Best partner for sexual reproduction within `radius` of `self`, or null (→
+  // asexual cloning) when alone. This is where mate *choice* lives: rather than
+  // always taking the nearest body, `self` scores each candidate by its
+  // `mateChoice` gene and picks the highest. The preference runs along the same
+  // lineage-hue axis kin recognition reads — `pref = 2·mateChoice − 1` in
+  // [-1, 1] — and the score trades that hue match off against distance:
+  //
+  //   score = pref · (2·hueSim − 1) − distWeight · (dist / radius)
+  //
+  // `2·hueSim − 1` is +1 for a clone-hue partner and −1 for a stranger, so a
+  // positive `pref` (mateChoice > 0.5) rewards similar partners (assortative /
+  // homogamy → speciation lever) and a negative one rewards distant partners
+  // (disassortative / inbreeding avoidance). At a neutral `mateChoice` (0.5)
+  // `pref` is 0, the hue term drops out, and the score is pure −distance — so it
+  // reduces *exactly* to "nearest wins", the old behaviour, and a missing gene
+  // defaults to neutral too. The hue spread has to be real for choice to bite:
+  // if every candidate is a stranger (or every one kin) the hue term is constant
+  // across them and distance breaks the tie, again falling back to nearest. Uses
+  // the same creature grid as the predation queries.
   findMate(self, radius) {
+    const pref = ((self.genome.mateChoice ?? 0.5) - 0.5) * 2;
+    const tol = CONFIG.scent.kinTolerance;
+    const w = CONFIG.creature.mateChoiceDistWeight;
+    const r2 = radius * radius;
     let best = null;
-    let bestD = radius * radius;
+    let bestScore = -Infinity;
     this.creatureGrid.forEachNear(self.x, self.y, radius, (c) => {
       if (c === self || !c.alive) return;
-      const d = wrapDistSq(self.x, self.y, c.x, c.y, this.width, this.height);
-      if (d < bestD) {
-        bestD = d;
+      const d2 = wrapDistSq(self.x, self.y, c.x, c.y, this.width, this.height);
+      if (d2 > r2) return;
+      const sim = hueSimilarity(self.lineageHue, c.lineageHue, tol);
+      const dn = Math.sqrt(d2) / radius; // normalised distance in [0, 1]
+      const score = pref * (2 * sim - 1) - w * dn;
+      if (score > bestScore) {
+        bestScore = score;
         best = c;
       }
     });
@@ -372,6 +396,7 @@ export class World {
       alarmTrust: 0,
       kinship: 0,
       mating: 0,
+      mateChoice: 0,
     };
     let maxGen = 0;
     let energy = 0;
@@ -388,6 +413,7 @@ export class World {
       avg.alarmTrust += c.genome.alarmTrust;
       avg.kinship += c.genome.kinship;
       avg.mating += c.genome.mating;
+      avg.mateChoice += c.genome.mateChoice;
       energy += c.energy;
       if (c.genome.diet > CONFIG.creature.carnivoreThreshold) carnivores++;
       if (c.generation > maxGen) maxGen = c.generation;

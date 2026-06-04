@@ -49,6 +49,22 @@ export const GENES = {
   // stalls reproduction outright; it only happens where there's someone to mix
   // with, so it co-evolves with the same clustering the scent/kin layers drive.
   mating: [0.0, 1.0], // readiness to reproduce sexually (vs. clone) when able
+
+  // Mate choice: when a creature does breed sexually it no longer simply pairs
+  // with whoever is nearest — this gene shapes *whom* it picks, along the same
+  // lineage-hue axis kin recognition already reads. It is centred at 0.5, which
+  // is exactly the old "nearest wins" behaviour (no preference); above 0.5 the
+  // creature mates assortatively (prefers partners whose hue is close to its
+  // own — homogamy, which can pull a clade toward reproductive isolation and so
+  // gives speciation a lever), and below 0.5 it mates disassortatively (prefers
+  // hue-distant partners — outbreeding / inbreeding avoidance, which keeps a
+  // lineage mixing with strangers). The preference trades off against distance
+  // (`creature.mateChoiceDistWeight`), so it only bends the choice among the
+  // partners actually in reach and only bites when there's a real hue spread to
+  // choose across; with everyone a stranger (or everyone kin) it collapses back
+  // to nearest. This is the sexual-selection counterpart to the `mating` gene:
+  // `mating` sets *whether* to mix genes, `mateChoice` sets *with whom*.
+  mateChoice: [0.0, 1.0], // assortative (>0.5) ↔ disassortative (<0.5) mate preference
 };
 
 export function randomGenome(rng) {
