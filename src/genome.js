@@ -138,6 +138,42 @@ function wrapHue(h) {
   return ((h % 360) + 360) % 360;
 }
 
+// Count distinct lineage-hue clusters among a set of hues, treating two hues as
+// belonging to the same cluster when they sit within `tolerance` degrees on the
+// colour wheel (single-linkage along the circle: a clade chains together so long
+// as no internal gap exceeds `tolerance`, even as it drifts wider than that
+// end-to-end). Only clusters with at least `minSize` members are tallied, so a
+// lone mutant or a transient splinter doesn't read as its own species. This is
+// the speciation read: as assortative mate choice isolates clades along the
+// lineage-hue axis, the population fragments into hue bands separated by gaps
+// wider than `tolerance`, and this counts the bands big enough to be real.
+export function countHueClusters(hues, tolerance, minSize = 1) {
+  const n = hues.length;
+  if (n === 0) return 0;
+  const sorted = hues.slice().sort((a, b) => a - b);
+  // Walk the sorted ring; a gap wider than `tolerance` between cyclic neighbours
+  // breaks one cluster from the next. `breaks` holds each index whose gap to its
+  // successor is a break (the successor starts a fresh arc).
+  const breaks = [];
+  for (let i = 0; i < n; i++) {
+    const next = i === n - 1 ? sorted[0] + 360 : sorted[i + 1];
+    if (next - sorted[i] > tolerance) breaks.push(i);
+  }
+  // No break anywhere: every hue chains into one ring-spanning cluster.
+  if (breaks.length === 0) return n >= minSize ? 1 : 0;
+  // Otherwise each break ends an arc; tally the arcs meeting the size floor. Arc
+  // sizes are the cyclic spans between consecutive breaks and sum to n.
+  let count = 0;
+  for (let b = 0; b < breaks.length; b++) {
+    const start = breaks[b];
+    const end = breaks[(b + 1) % breaks.length];
+    let size = (end - start + n) % n;
+    if (size === 0) size = n; // a single break → one arc holding all n
+    if (size >= minSize) count++;
+  }
+  return count;
+}
+
 // Kin-similarity between two lineage hues, in [0, 1]: 1 when identical, falling
 // linearly to 0 once they are `tolerance` degrees apart on the colour wheel (a
 // stranger). Used to weight scent response toward kin. A null/undefined hue

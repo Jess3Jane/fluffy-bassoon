@@ -33,6 +33,7 @@ export class History {
     this.samples.push({
       population: stats.population,
       carnivores: stats.carnivores,
+      species: stats.species,
       food: stats.food,
       diet: stats.avg.diet,
       speed: stats.avg.speed,

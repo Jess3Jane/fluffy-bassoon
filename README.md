@@ -132,6 +132,16 @@ The toll is kept well under the base cost of breeding, so it taxes choosiness
 without making sex itself uneconomical, and the asexual / no-mate path pays
 nothing.
 
+Now that assortative mate choice can isolate clades and courtship cost gives that
+isolation a price, a **speciation readout** makes the result legible instead of
+leaving you to squint at the colour bands. The live population's lineage hues are
+clustered by single-linkage along the colour wheel — a clade chains into one
+cluster so long as no gap between neighbouring hues is wider than the same
+tolerance kin recognition uses, while two clades parted by a real gap read as two
+— and clusters too small to be more than a passing mutant are dropped. The result
+is a **species** count in the HUD and a third history chart panel, so you can
+watch one lineage split into two or three (and merge back) over time.
+
 ## Run it
 
 It's a static site with no build step. Either open `index.html` through a local
@@ -160,7 +170,8 @@ Or just use the deployed GitHub Pages site.
   green herbivore / red carnivore) and *Lineage*: each genome carries a neutral
   hue that descends with a slight drift, so clades show up as distinct colour
   bands and you can watch a lineage spread or wink out.
-- The HUD shows live population, carnivore count, food, kills, top generation,
+- The HUD shows live population, the **species** count (distinct lineage-hue
+  clades large enough to count), carnivore count, food, kills, top generation,
   the current time of day (Day / Dusk / Night / Dawn with a daylight percentage),
   the season (Summer / Autumn / Winter / Spring), weather (Drought … Storm, with
   the combined climate food percentage), the wind (Calm, or a compass bearing and
@@ -169,11 +180,12 @@ Or just use the deployed GitHub Pages site.
   voice and trust), `kinship` (how strongly the creature filters scent by the
   caller's lineage), `mating` (how readily it breeds sexually vs. clones), and
   `mateChoice` (assortative vs. disassortative partner preference).
-- Two **history charts** in the HUD trace the world over time: a population
-  panel (total population with the carnivore sub-band) and an average-trait
-  panel (diet plus speed/size normalised onto a shared 0–1 axis), so you can
-  watch booms, crashes, and trait drift unfold. History is sampled on sim-time,
-  so the window reads the same whatever the speed setting.
+- Three **history charts** in the HUD trace the world over time: a population
+  panel (total population with the carnivore sub-band), an average-trait panel
+  (diet plus speed/size normalised onto a shared 0–1 axis), and a species panel
+  (the lineage-hue clade count), so you can watch booms, crashes, trait drift,
+  and clades splitting apart unfold. History is sampled on sim-time, so the
+  window reads the same whatever the speed setting.
 
 ## Develop
 

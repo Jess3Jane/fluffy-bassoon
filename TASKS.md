@@ -378,17 +378,48 @@ population dynamics, natural selection, and surprising behaviour.
       than a neutral one for the same layout (and exactly the far-kin toll), and
       that the asexual path pays `reproduceCost` only.
 
+- [x] Speciation readout, so emergent speciation is legible rather than only
+      inferable from squinting at the lineage-hue colour bands. A pure
+      `countHueClusters(hues, tolerance, minSize)` (`src/genome.js`) clusters the
+      live population's lineage hues by **single-linkage along the colour wheel**:
+      it sorts the hues, walks the ring, and breaks one cluster from the next
+      wherever the circular gap between neighbours exceeds `tolerance` — so a
+      clade chains together into one cluster even when it has drifted wider than
+      the tolerance end-to-end (no internal gap exceeds it), while two clades
+      separated by a real gap read as two. The seam at 0/360 is handled (the
+      wrap-around gap is measured circularly, so a clump straddling it stays one),
+      and a full ring with no break anywhere counts as one cluster, not zero. Only
+      clusters with at least `minSize` members are tallied (`CONFIG.speciation.
+      minClusterSize`, 3), so a lone mutant or a dying splinter doesn't inflate the
+      count. It clusters against the *same* `scent.kinTolerance` kin recognition
+      reads, so a clade reads as one species exactly as it reads as one kin group.
+      `World.stats()` collects the hues in its existing single pass over creatures
+      and surfaces a `species` count; it's pure observation derived from live
+      state, changing nothing about the simulation and adding nothing to the save
+      (no `SAVE_VERSION` bump). The HUD shows a **Species** row, the `History` ring
+      samples `species` like the other series, and `src/charts.js` gains a third
+      stacked sparkline panel (scaled to its own windowed peak so a split from one
+      clade into two or three is visible despite the small raw numbers; the charts
+      canvas grew to fit). `test/speciation.test.mjs` covers the empty/singleton
+      edges, a tight clump, a wide-but-chained clade, two and three separated
+      bands, the 0/360-seam wrap, the no-break full ring, the size floor dropping a
+      splinter, identical hues, and the wiring through `World.stats()`.
+
 ## Next up
 
-- [ ] Speciation readout: assortative mate choice can now isolate clades and
-      courtship cost gives that isolation a price, but the only way to *see*
-      speciation is to squint at the lineage-hue colour bands. Track and surface
-      *how many* distinct lineage-hue clusters are breeding-isolated over time — a
-      species count in the HUD and/or a charts panel — so emergent speciation is
-      legible rather than only inferable. (One approach: cluster live creatures by
-      circular hue distance against `kinTolerance`, count clusters above a size
-      floor, and sample it into the existing `History` ring buffer like the other
-      trait series.) Or pick another seed below.
+- [ ] Speciation needs a *behavioural* definition, not just a colour one. The
+      readout above clusters by the neutral `lineageHue` marker, which tracks
+      ancestry but says nothing about whether two clades are actually
+      reproductively isolated *or* ecologically distinct — two clades could share
+      a hue band yet have diverged in diet/size, or sit in different hue bands yet
+      still interbreed freely. Consider either (a) a genetic-distance species
+      definition that clusters on the *adaptive* genes (diet, size, speed, …)
+      rather than the neutral marker, surfaced alongside the hue count so the two
+      can be compared; or (b) measuring realised reproductive isolation directly
+      (track the share of matings that cross hue clusters over a window — falling
+      cross-cluster mating *is* speciation happening, and `mateChoice` + courtship
+      cost are exactly the levers that should drive it down). Or pick another seed
+      below.
 
 ## Ideas / someday
 

@@ -1,9 +1,10 @@
-// Tiny sparkline charts for the HUD, drawn straight to a canvas. Two stacked
+// Tiny sparkline charts for the HUD, drawn straight to a canvas. Three stacked
 // panels read out of a History ring: population over time (with the carnivore
-// sub-band) and the average-trait drift (diet, plus speed/size normalised to
-// their gene ranges so they share a 0–1 axis). Together they make the
-// emergent story legible — booms and crashes, and the selection pressure
-// behind them — without leaving the page.
+// sub-band), the average-trait drift (diet, plus speed/size normalised to their
+// gene ranges so they share a 0–1 axis), and the speciation count (how many
+// distinct lineage-hue clades are large enough to count). Together they make the
+// emergent story legible — booms and crashes, the selection pressure behind
+// them, and clades splitting apart — without leaving the page.
 
 import { normTrait } from "./history.js";
 
@@ -36,7 +37,7 @@ export class Charts {
     ctx.clearRect(0, 0, this.w, this.h);
 
     const s = history.samples;
-    const panelH = (this.h - GAP) / 2;
+    const panelH = (this.h - GAP * 2) / 3;
 
     // Population & carnivores share an axis: carnivores are a subset of the
     // population, so plotting both against the population peak shows the
@@ -56,6 +57,15 @@ export class Charts {
       { color: "#e2664f", label: "diet", values: s.map((d) => d.diet) },
       { color: "#8fb3ff", label: "speed", values: s.map((d) => normTrait("speed", d.speed)) },
       { color: "#d9b25f", label: "size", values: s.map((d) => normTrait("size", d.size)) },
+    ]);
+
+    // Species count: distinct lineage-hue clades, scaled to its own windowed
+    // peak so a split from one clade into two or three is visible even though
+    // the raw numbers are small.
+    const spMax = history.max("species", 1);
+    this.panel(2 * (panelH + GAP), panelH, "Species", String(spMax), [
+      { color: "#b48ef0", fill: "rgba(180,142,240,0.14)", label: "clades",
+        values: s.map((d) => (d.species || 0) / spMax) },
     ]);
   }
 
