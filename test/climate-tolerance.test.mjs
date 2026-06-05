@@ -210,7 +210,7 @@ function stepOne({ warmthPref, wetnessPref, time = 0, seed = 9, genomeSeed = 123
   const world = new World(makeRng(77));
   for (let i = 0; i < 120; i++) world.update(dt);
   const blob = JSON.parse(JSON.stringify(world.serialize()));
-  assert.equal(blob.version, 12, "snapshot carries the current SAVE_VERSION");
+  assert.equal(blob.version, 13, "snapshot carries the current SAVE_VERSION");
 
   const restored = World.deserialize(blob, makeRng());
   assert.deepEqual(

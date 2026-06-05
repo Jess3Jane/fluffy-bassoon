@@ -184,7 +184,7 @@ function clump(x, y, kind, n) {
   const world = new World(makeRng(31));
   for (let i = 0; i < 200; i++) world.update(1 / 60);
   const blob = JSON.parse(JSON.stringify(world.serialize()));
-  assert.equal(blob.version, 12, "save version covers the heritable canopy gene");
+  assert.equal(blob.version, 13, "save version covers the heritable canopy gene");
   assert.equal(blob.vegetation, undefined, "the vegetation field is not serialized (it's recomputed)");
 
   const restored = World.deserialize(blob, makeRng());

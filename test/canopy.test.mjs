@@ -210,24 +210,27 @@ const NEUTRAL = CONFIG.vegetation.canopy.neutral;
   const world = new World(makeRng(31));
   for (let i = 0; i < 600; i++) world.update(1 / 30);
   const blob = JSON.parse(JSON.stringify(world.serialize()));
-  assert.equal(blob.version, 12, "the heritable canopy gene bumps SAVE_VERSION to 12");
-  assert.ok(blob.food.length > 0 && blob.food[0].length === 4, "food serializes as [x, y, kind, canopyAmp]");
+  assert.equal(blob.version, 13, "the canopy + lineage genes bump SAVE_VERSION to 13");
+  assert.ok(blob.food.length > 0 && blob.food[0].length === 5, "food serializes as [x, y, kind, canopyAmp, lineage]");
   assert.ok(blob.food.every(([, , , a]) => a >= 0 && a <= 1), "every serialized canopy gene is in range");
+  assert.ok(blob.food.every(([, , , , l]) => typeof l === "number"), "every serialized pellet carries a lineage tag");
+  assert.ok(typeof blob.nextPlantLineage === "number", "the lineage counter rides the save");
 
   const restored = World.deserialize(blob, makeRng());
+  assert.equal(restored.nextPlantLineage, world.nextPlantLineage, "the lineage counter restores exactly");
   for (let i = 0; i < 600; i++) {
     world.update(1 / 30);
     restored.update(1 / 30);
   }
   assert.deepEqual(
-    restored.food.map((f) => [Math.round(f.x * 1e6), Math.round(f.y * 1e6), f.kind, Math.round(f.canopyAmp * 1e6)]),
-    world.food.map((f) => [Math.round(f.x * 1e6), Math.round(f.y * 1e6), f.kind, Math.round(f.canopyAmp * 1e6)]),
-    "the larder (canopy genes included) replays bit-identically across save/load",
+    restored.food.map((f) => [Math.round(f.x * 1e6), Math.round(f.y * 1e6), f.kind, Math.round(f.canopyAmp * 1e6), f.lineage]),
+    world.food.map((f) => [Math.round(f.x * 1e6), Math.round(f.y * 1e6), f.kind, Math.round(f.canopyAmp * 1e6), f.lineage]),
+    "the larder (canopy + lineage included) replays bit-identically across save/load",
   );
 
   const stale = JSON.parse(JSON.stringify(world.serialize()));
-  stale.version = 11;
-  assert.throws(() => World.deserialize(stale, makeRng()), /unsupported save version/, "a pre-v12 save is rejected");
+  stale.version = 12;
+  assert.throws(() => World.deserialize(stale, makeRng()), /unsupported save version/, "a pre-v13 save is rejected");
 }
 
 console.log("CANOPY TEST PASSED");

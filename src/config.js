@@ -370,6 +370,41 @@ export const CONFIG = {
       // and the world is exactly as before.
       witherRate: 1.5, // per-second cull rate at zero viability (scaled by 1 − viability)
       witherFoodSoftCap: 220, // larder size at/above which withering runs at full strength; it tapers to 0 below, so culling can't strip a struggling larder
+
+      // Kin-structured withering — the canopy sort widened by making *selection
+      // intensity* a public good shared among lineage neighbours (echoing the
+      // scent/kin layers), rather than a shelter benefit. Every plant carries a
+      // neutral `lineage` tag (an integer founded by a pioneer and inherited verbatim
+      // by its sprouts — no rng, so the deterministic stream is untouched), and the
+      // **kin gate** is how densely *same-lineage* neighbours cluster around a plant
+      // (`World.kinDensityAt`, saturating at `kinDensityNorm` neighbours within
+      // `kinDensityRadius`, in [0, 1]). In the withering pass the per-plant cull
+      // chance is amplified by `1 + kinWitherSharpen · kinGate`, so where a lineage
+      // clusters densely, a plant whose canopy is *mismatched to its ground* is culled
+      // harder — a barren kin stand purifies onto its (heavy) local optimum and a
+      // benign one onto its (light) optimum, widening the realised harsh-vs-benign gap.
+      //
+      // Two design failures the brief flagged, both confirmed by sweeps and both
+      // avoided here, set the shape of this lever:
+      //   • a *shelter bonus* (kin-gated or not) ADDS survival on barren ground, which
+      //     blooms it into a food magnet, raises kin density everywhere, saturates the
+      //     gate, and collapses the discrimination (a paired 12-seed sweep narrowed the
+      //     sort and tipped seeds into extinction). Sharpening *removes* the mismatched
+      //     instead of sparing the matched, so total food only falls — it cannot bloom.
+      //   • a *pooled received-shelter* public good erodes the own-canopy commons (a
+      //     cheat free-rides on its neighbours), collapsing investment. Here selection
+      //     still acts on each plant's *own* viability (`canopyViability`, unchanged) —
+      //     a well-matched plant (viability 1) never withers however dense its kin — so
+      //     there is no commons to erode and no free-riding; the gate only *intensifies*
+      //     the cull of the genuinely mis-invested.
+      // At `kinWitherSharpen` 0 (or a tagless pellet / no kin in reach → gate 0) the
+      // withering is exactly the old pass, so the global equilibrium and every canopy
+      // test are preserved. The gate reads the step-boundary `canopyGrid`, draws no
+      // fresh rng path, and replays bit-for-bit; the `lineage` tag rides the food tuple
+      // (SAVE_VERSION → 13).
+      kinWitherSharpen: 4, // how much dense kin amplify the wither pressure on a mismatched canopy (0 = off, old withering)
+      kinDensityRadius: 55, // reach over which same-lineage neighbours are counted for the gate
+      kinDensityNorm: 10, // same-lineage neighbour count at which the kin gate saturates to 1
     },
   },
 
