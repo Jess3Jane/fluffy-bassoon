@@ -76,6 +76,26 @@ export const CONFIG = {
     // roughly unchanged — generalism is the discount, specialism the payoff.
     forageExponent: 1.4,
     forageMinEff: 0.25,
+
+    // Microclimate feedback onto the larder. The microclimate already partitions
+    // the *animals* across space (warm-adapted clades settle the warm regions);
+    // these two knobs let the same spatial warmth/wetness mosaic also shape the
+    // *plants*, so the climate map and the plant-kind patchwork reinforce each
+    // other into one coherent biome instead of two independent overlays. Both
+    // pull along the kinds' own climate leans — sunleaf (kind 0) thrives in warm,
+    // wet ground, moonleaf (kind 1) in cool, dry — so each kind grows where it
+    // pays. Both fall back to the old position-only behaviour at 0.
+    //   • `microclimateKindBias` nudges *which* kind sprouts at a spot: a warm-wet
+    //     region tilts the `plantKindAt` patchwork toward sunleaf, a cool-dry one
+    //     toward moonleaf, so a region settles predominantly onto the kind its
+    //     climate favours rather than a fixed ~50/50 sine split.
+    //   • `microclimateFertilityBias` then tilts *how richly* that kind takes
+    //     root there (a centred multiplier on the terrain fertility roll, like
+    //     terrain's own spatial fertility): boosted for a kind in the climate it
+    //     thrives in, thinned for one out of place — so an out-of-biome sprout is
+    //     suppressed and each region's favoured kind grows the more densely.
+    microclimateKindBias: 1.2,
+    microclimateFertilityBias: 0.5,
   },
 
   creature: {

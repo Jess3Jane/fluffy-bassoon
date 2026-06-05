@@ -728,17 +728,72 @@ population dynamics, natural selection, and surprising behaviour.
       climate-tolerance test neutralises the spatial amplitudes so it keeps
       isolating the global formula.
 
+- [x] The microclimate now feeds back onto the **larder**, not only the animals,
+      knitting the spatial climate mosaic and the plant-kind patchwork into one
+      coherent biome instead of two independent overlays. Two centred knobs
+      (`CONFIG.food.microclimateKindBias` / `microclimateFertilityBias`) let a
+      region's warmth/wetness *offset* (the same per-region offset the creatures'
+      `climateStress` already reads) bias the plants along the kinds' own climate
+      leans: sunleaf (kind 0) thrives in warm, wet ground, moonleaf (kind 1) in
+      cool, dry. A small source-of-truth in `src/plants.js`, `kindClimateScore(kind,
+      dw, dm)` — `+(dw+dm)` for sunleaf, its negation for moonleaf — drives both
+      halves. **Which kind** sprouts: `kindClimateBias` nudges `plantKindAt`'s
+      threshold (now taking an optional `climateBias`, 0 for every old caller) so a
+      warm-wet region tilts the sine patchwork toward sunleaf and a cool-dry one
+      toward moonleaf, settling each region predominantly onto the kind its climate
+      favours rather than the bare ~50/50 split. **How richly**: `kindFertilityFactor`
+      lays a centred multiplier (`1 + bias·score`, floored at 0) over the terrain
+      fertility roll in `World.spawnFood` — exactly the way terrain's own spatial
+      fertility already shapes the larder — so an in-biome kind takes root more
+      readily and an out-of-place sprout is suppressed, each region's favoured kind
+      growing the denser. The food brush's explicit placements take the same
+      biome-correct kind. Crucially this **closes the loop** with the
+      climate-tolerance layer: a warm-adapted, sunleaf-foraging clade now has a
+      single region that suits both its `warmthPref`/`wetnessPref` tolerance *and*
+      its `forage` diet, so the two spatial sortings (animals into their climate,
+      plants into theirs) reinforce one mosaic. The microclimate regrows bit-for-bit
+      from its seed and draws no rng, so the spawn attempt count — and thus the
+      whole deterministic stream — is unchanged from the terrain-only version, and a
+      restored world replays bit-identically; the kinds ride the existing food
+      serialization and the bias is recomputed from the seed-grown field, so there's
+      **no new serialized state and no `SAVE_VERSION` bump** (an older v11 save loads
+      fine — its stored pellet kinds are just data, new growth uses the new logic).
+      `stats()` surfaces a **`biomeSort`** readout (the standing larder's mean
+      normalised `kindClimateScore`, in [-1, 1]): positive as the spawn feedback
+      knits the kinds to the climate, and a live tug against grazing (which strips
+      the in-biome stock fastest, so a heavy bloom can pull it down), null with no
+      food. The HUD shows a **Biome** row beside **Climate sort**; the renderer
+      needs no change — the kind already colours each pellet (green sunleaf / violet
+      moonleaf) over the microclimate's amber-warm / blue-cool wash, so the biome
+      reads at a glance for free. A 10-minute headless run holds the same boom/bust
+      population band (16–97, self-sustaining) with active predation (≈820 kills)
+      and 4–7 coexisting ecotypes, no NaNs, and a freshly seeded larder reads a
+      clearly positive biome alignment. `test/biome.test.mjs` covers the score
+      (sunleaf/moonleaf opposites, the warm-wet/cool-dry signs, cancellation), the
+      kind-threshold nudge (a spot flipped by a warm-wet region, kept by a cool-dry
+      one, bare at zero offset), the fertility factor (boost in-climate, thin out,
+      the [0, …] floor, flat 1 with no signal), the off-switch at bias 0, the wiring
+      through `spawnFood` (a seeded larder sorts by region, both kinds still grow,
+      explicit placement takes the biome kind), the `biomeSort` readout (positive,
+      bounded, matching a hand computation, null with no food, null/NaN-free with a
+      flat microclimate), and the bit-identical save/load replay.
+
 ## Next up
 
-- [ ] Give the microclimate a feedback onto the *larder*, not only the animals:
-      let a region's warmth/wetness offset bias which **plant kind** sprouts there
-      and how richly (sunleaf favouring the warm-wet corners, moonleaf the cool-dry
-      ones), so the spatial climate mosaic and the plant-kind patchwork reinforce
-      each other into one coherent biome map instead of two independent overlays —
-      a warm-adapted, sunleaf-foraging clade then has a single region that suits
-      both its tolerance *and* its diet. Pairs with terrain fertility (already
-      spatial) and closes the loop between the new microclimate and the existing
-      `plantKindAt` / `kindYieldFactor`. Or pick a seed below.
+- [ ] Let the **larder feed back onto the microclimate gradient** the creatures
+      already sort along — give vegetation a local cooling/wetting influence, so a
+      dense patch of plants nudges its own region's effective warmth/wetness (a
+      green canopy runs cooler and damper, bare ground hotter and drier). That
+      would close the last loop: the microclimate shapes which kind grows where
+      (just landed), and the standing vegetation would in turn shape the
+      microclimate — a slow two-way coupling that could make biome boundaries
+      sharpen, drift, or oscillate rather than sitting fixed on the seed's noise.
+      Care needed to keep it a *bounded, mean-respecting* nudge (like the existing
+      centred climate tilts) so it enriches the dynamics without running away into
+      a frozen or a barren world; and to keep it deterministic (it would have to
+      become real serialized state, since it depends on where plants stand, unlike
+      the pure-in-time/seed climate so far — or be recomputed each step from the
+      live larder, adding no state). Or pick a seed below.
 
 ## Ideas / someday
 
