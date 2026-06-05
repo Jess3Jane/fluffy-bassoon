@@ -1105,13 +1105,41 @@ population dynamics, natural selection, and surprising behaviour.
       how close those optima sit (pushing them apart via the benign spawn channel
       starves the world, as found above). Widening it further is lever (c) below.
 
+- [x] **UI/UX: collapsible stat groups** (follow-up (b) to the inspector/camera),
+      so the left HUD's ~35 stat rows fold into labelled, collapsible sections
+      instead of presenting one flat scrollable wall. The flat list (plus its two
+      faint `—————` dividers) is now four `<details>` groups — **Population**
+      (census: pop/peak/species/eco-species/isolation/carnivores/top-gen/avg-energy/
+      kills), **World & climate** (larder + the day-night/season/weather/wind
+      rhythms), **Traits & niche** (the trait averages plus the climate/biome/canopy
+      sort readouts), and **Social** (the voice/trust/kinship/mating signalling
+      traits) — each with a custom mono-theme disclosure triangle, mirroring how the
+      inspector groups the genome into Body & senses / Diet & niche / Social. The
+      two trait-heavy groups default **collapsed** so the panel opens as a compact
+      census-plus-climate summary, halving the visible rows; a viewer expands what
+      they're watching. The non-obvious bit was preserving that open/closed state:
+      `updateHud` repaints ~6×/sec, and the old code rebuilt `statsEl.innerHTML`
+      wholesale each time — which would reset every `<details>` back to its default
+      the instant after a viewer collapsed it (a collapse lasting a sixth of a
+      second). So the HUD is now declared once as data (`HUD_GROUPS`: groups of
+      `[label, read]` rows, `read` taking the live `world.stats()` snapshot),
+      `buildHud()` constructs the skeleton DOM a single time at boot and collects
+      each value span into `hudCells`, and `updateHud()` only rewrites those spans'
+      text — so the browser keeps the open/closed state a viewer sets, and the panel
+      no longer reflows wholesale every tick (a small perf win too). Purely a *view*
+      restructure: no rng, no serialized state, no simulation touch (no
+      `SAVE_VERSION` bump), so the headless suite is untouched and still green; the
+      build/update algorithm (groups built with the right default-open states, value
+      refreshes leaving a user-collapsed group collapsed) was checked with a minimal
+      DOM shim, since — like the renderer and main entry point — the live `<details>`
+      DOM needs a browser. CSS hides the default disclosure marker for a triangle
+      that rotates on open and matches the inspector's uppercase-accent section heads.
+
 ## Next up
 
-- [ ] **UI/UX, continued.** Two passes have landed — a *creature inspector* and
-      now a *pan/zoom camera* (both below); remaining follow-ups: (b) **collapsible
-      stat groups** in the left HUD — the ~35 rows are now scrollable but still a
-      flat wall, so fold them into labelled `<details>` sections (Population /
-      Climate / Niche / Social) the way the inspector groups its genome; (c)
+- [ ] **UI/UX, continued.** Three passes have landed — a *creature inspector*, a
+      *pan/zoom camera*, and now *collapsible stat groups* (all below); remaining
+      follow-ups: (c)
       **click-through inspector links** — jump from a creature to its nearest kin
       or its current target (now that the camera can zoom to it); (d) a **legend**
       for the canvas colours/washes (trophic vs. lineage, the amber/blue climate
