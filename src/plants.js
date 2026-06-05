@@ -30,9 +30,45 @@ import { seasonLevel, weatherNoise } from "./weather.js";
 // species grow in distinct regions — a spatial sub-resource axis a forager clade
 // can specialise on and follow into its own patches. A pure function of position
 // (drawing no rng), so it's both deterministic across save/load and free of any
-// perturbation to the simulation's random stream. The split is ~50/50 by area.
-export function plantKindAt(x, y) {
-  return Math.sin(x * 0.012) + Math.sin(y * 0.016) > 0 ? 1 : 0;
+// perturbation to the simulation's random stream. The bare split is ~50/50 by
+// area; a `climateBias` (the microclimate's nudge from `kindClimateBias`, 0 by
+// default so every old caller is unchanged) shifts the threshold so a region
+// settles onto the kind its local climate favours — see `kindClimateBias`.
+export function plantKindAt(x, y, climateBias = 0) {
+  return Math.sin(x * 0.012) + Math.sin(y * 0.016) + climateBias > 0 ? 1 : 0;
+}
+
+// How aligned a kind is with the local microclimate, given that region's warmth
+// and wetness *offsets* from the global average (both centred on 0, from
+// `Microclimate`). Sunleaf (kind 0) thrives in warm, wet ground; moonleaf (kind
+// 1) in cool, dry — matching the kinds' own season/weather leans — so the score
+// is `+(dw + dm)` for sunleaf and the negation for moonleaf: positive where the
+// kind belongs, negative where it's out of place. The single source of truth the
+// kind-threshold and fertility biases below both read.
+export function kindClimateScore(kind, warmthOffset, wetnessOffset) {
+  const lean = kind === 1 ? -1 : 1;
+  return lean * (warmthOffset + wetnessOffset);
+}
+
+// The signed nudge fed to `plantKindAt`'s threshold for a spot with these
+// microclimate offsets. The sine field reads `> 0 → moonleaf`, so to favour
+// sunleaf (kind 0) in warm-wet ground the nudge must go *negative* there, and
+// positive (toward moonleaf) in cool-dry ground — i.e. `−bias·(dw + dm)`. At
+// `microclimateKindBias` 0 it vanishes and the patchwork is the bare sine split.
+export function kindClimateBias(warmthOffset, wetnessOffset) {
+  return -CONFIG.food.microclimateKindBias * (warmthOffset + wetnessOffset);
+}
+
+// A centred multiplier on how readily a plant of `kind` takes root at a spot,
+// given its microclimate offsets — the "how richly" half of the feedback, laid
+// over the terrain fertility roll the way terrain's own spatial fertility is. A
+// kind in the climate it thrives in is boosted (> 1), one out of place thinned
+// (< 1, floored at 0 so it can't go negative), so an out-of-biome sprout is
+// suppressed and each region's favoured kind grows the more densely. At
+// `microclimateFertilityBias` 0 it's a flat 1 (the old terrain-only behaviour).
+export function kindFertilityFactor(kind, warmthOffset, wetnessOffset) {
+  const score = kindClimateScore(kind, warmthOffset, wetnessOffset);
+  return Math.max(0, 1 + CONFIG.food.microclimateFertilityBias * score);
 }
 
 // The multiplier on the energy a creature extracts from a plant of `kind` right

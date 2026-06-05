@@ -84,6 +84,14 @@ faint amber where a region runs warm and blue where it runs cool, and the HUD's
 **Climate sort** row tracks how strongly the clades have settled into the climate
 that suits them.
 
+That microclimate also feeds back onto the **larder**, not only the animals:
+a region's warmth/wetness biases which plant kind sprouts there and how richly,
+along the kinds' own climate leans — sunleaf favours the warm, wet corners,
+moonleaf the cool, dry ones. So the climate mosaic and the plant-kind patchwork
+fuse into one coherent biome, and a warm-adapted, sunleaf-foraging clade finds a
+single region that suits both its tolerance and its diet. The HUD's **Biome** row
+reports how well the standing larder's kinds sit in the climate that favours each.
+
 The world is laid over a **terrain** map of grassland dotted with patches of
 water, fertile soil, and barren ground. Food springs up thickest on fertile
 soil, sparsely on barren ground, and never on water; creatures wade slowly
@@ -245,7 +253,8 @@ Or just use the deployed GitHub Pages site.
   `mateChoice` (assortative vs. disassortative partner preference), and the
   `warmthPref` / `wetnessPref` climate tolerances — plus a **Climate sort** row
   reporting how strongly the population has settled into the microclimate it
-  prefers, per axis.
+  prefers, per axis, and a **Biome** row reporting how well the standing larder's
+  plant kinds sit in the climate that favours each.
 - Four **history charts** in the HUD trace the world over time: a population
   panel (total population with the carnivore sub-band), an average-trait panel
   (diet plus speed/size normalised onto a shared 0–1 axis), a species panel (the

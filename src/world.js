@@ -26,7 +26,13 @@ import {
 import { Terrain } from "./terrain.js";
 import { Microclimate } from "./microclimate.js";
 import { ScentField } from "./scent.js";
-import { plantKindAt, kindYieldFactor } from "./plants.js";
+import {
+  plantKindAt,
+  kindYieldFactor,
+  kindClimateBias,
+  kindFertilityFactor,
+  kindClimateScore,
+} from "./plants.js";
 
 // Largest a creature's body can get, used to size contact-query windows.
 const MAX_CREATURE_RADIUS = CONFIG.creature.radius * GENES.size[1];
@@ -146,28 +152,38 @@ export class World {
   spawnFood(x, y) {
     if (this.food.length >= CONFIG.food.maxCount) return null;
 
-    let fx = x;
-    let fy = y;
-    if (fx === undefined) {
-      let found = false;
+    if (x === undefined) {
+      // A random spawn samples the terrain *and* the microclimate: it makes a
+      // few attempts, keeping the first spot whose terrain fertility — tilted by
+      // how well the kind that would sprout there suits the local climate — wins
+      // a roll. So plants cluster on fertile soil (as before) and each kind also
+      // clusters in the region its climate favours, the spatial climate mosaic
+      // and the plant patchwork reinforcing one biome map. The microclimate
+      // regrows bit-for-bit from its seed and draws no rng, so the attempt count
+      // (and thus the rng stream) is unchanged from the terrain-only version.
       for (let i = 0; i < CONFIG.terrain.foodAttempts; i++) {
         const px = this.rng.range(0, this.width);
         const py = this.rng.range(0, this.height);
-        if (this.rng.chance(this.terrain.fertilityAt(px, py))) {
-          fx = px;
-          fy = py;
-          found = true;
-          break;
+        const dw = this.microclimate.warmthOffsetAt(px, py);
+        const dm = this.microclimate.wetnessOffsetAt(px, py);
+        const kind = plantKindAt(px, py, kindClimateBias(dw, dm));
+        const fertility =
+          this.terrain.fertilityAt(px, py) * kindFertilityFactor(kind, dw, dm);
+        if (this.rng.chance(fertility)) {
+          const f = { x: px, y: py, kind };
+          this.food.push(f);
+          return f;
         }
       }
-      if (!found) return null;
+      return null;
     }
 
-    // A pellet's plant kind is a pure function of where it sprouts, so the two
-    // species grow in distinct patches of the map (a spatial niche axis) and —
-    // crucially — assigning it draws no rng, so adding plant kinds leaves the
-    // deterministic stream byte-identical to before.
-    const f = { x: fx, y: fy, kind: plantKindAt(fx, fy) };
+    // Explicit placement (the food brush): planted verbatim wherever asked,
+    // terrain or not — but the kind still reflects the local biome (the same
+    // climate-biased patchwork a natural sprout would land on).
+    const dw = this.microclimate.warmthOffsetAt(x, y);
+    const dm = this.microclimate.wetnessOffsetAt(x, y);
+    const f = { x, y, kind: plantKindAt(x, y, kindClimateBias(dw, dm)) };
     this.food.push(f);
     return f;
   }
@@ -558,7 +574,32 @@ export class World {
     // sub-resources stock up — an unexploited kind piling up is the open niche
     // pulling a forager clade toward it.
     const foodByKind = [0, 0];
-    for (const f of this.food) foodByKind[f.kind === 1 ? 1 : 0]++;
+    // Biome alignment: how strongly the *standing* larder's kinds sit in the
+    // climate that suits each — the larder-side echo of the climate sort the
+    // animals show. Average each pellet's `kindClimateScore` (positive when it
+    // grows where its kind belongs: sunleaf warm-wet, moonleaf cool-dry) and
+    // normalise by the largest score the offsets can produce, so it lands in
+    // [-1, 1]. The *spawn* bias makes it positive (each kind sprouts where it
+    // belongs), but it reads what's actually on the ground, so heavy grazing can
+    // pull it down or even negative — foragers strip the in-biome stock fastest
+    // (they cluster in their own climate), leaving the thinner out-of-biome
+    // remnants standing. So it tracks the live tug between the spawn feedback and
+    // consumption rather than a static map. ~0 with the feedback off or no
+    // spread; null with no food. Pure observation — no rng, no feedback.
+    let biomeScore = 0;
+    const biomeNorm = this.microclimate.warmthAmp + this.microclimate.wetnessAmp;
+    for (const f of this.food) {
+      foodByKind[f.kind === 1 ? 1 : 0]++;
+      biomeScore += kindClimateScore(
+        f.kind,
+        this.microclimate.warmthOffsetAt(f.x, f.y),
+        this.microclimate.wetnessOffsetAt(f.x, f.y),
+      );
+    }
+    const biomeSort =
+      this.food.length > 0 && biomeNorm > 0
+        ? biomeScore / this.food.length / biomeNorm
+        : null;
     // What each plant kind is worth *right now* — its richness × day-night
     // rhythm — so the HUD can show which specialism the clock currently favours
     // (a sunleaf peaking by day, a moonleaf by night) beside the standing split.
@@ -603,6 +644,7 @@ export class World {
       isolation,
       climateSortWarmth,
       climateSortWetness,
+      biomeSort,
       avg,
     };
   }
