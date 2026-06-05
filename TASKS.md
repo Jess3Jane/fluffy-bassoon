@@ -990,6 +990,41 @@ population dynamics, natural selection, and surprising behaviour.
       kin-structured canopy as a public good sustained only among lineage neighbours,
       and/or tighter canopy dispersal — is the follow-up below.
 
+- [x] **A spatial canopy-sort readout, and the finding that the simple realisation
+      levers don't move it.** The condition-dependent optimum (above) makes the canopy
+      a sprout is *selected toward* diverge across the biome (heavier on barren ground,
+      lighter on fertile), but nothing yet read back whether the *standing* larder
+      actually tracks that target. `World.stats()` now splits the live larder's mean
+      `canopyAmp` by local seedling **harshness** — the very gradient the germination
+      curve selects along (`canopyHarshnessAt`, terrain barrenness) — bucketed at
+      `harshnessRef` into **harsh** (barren) vs. **benign** (fertile/grass) ground, and
+      reports both means plus their signed difference `canopySort` (positive when
+      barren stands out-invest fertile ones, the direction the target points). Each
+      mean is null with an empty bucket and the sort null unless both are populated
+      (the HUD shows "—" rather than a misleading 0). It folds into the existing single
+      pass over the food in `stats()`, draws **no rng**, and adds **no serialized
+      state** (pure observation, no `SAVE_VERSION` bump) — every replay/save test passes
+      untouched. The HUD gains a **Canopy sort** row (`harsh/benign (±gap)`) beside the
+      existing **Canopy** mean. With the instrument in hand, a sweep settled the
+      realisation question for the cheap levers: across `inheritRadius` ∈ {25…90} ×
+      `harshnessGain` ∈ {2.4…8} (× a pioneer-fallback that copies the nearest *any*-kind
+      parent instead of resetting to neutral), the realised `canopySort` never left the
+      noise band (mean over seeds ≈ −0.01…+0.03, individual seeds straddling 0) and a
+      clean 6-minute default run reads −0.03…+0.02. The root cause the readout exposes:
+      on **harsh** ground the germination curve is nearly *flat in canopy* (the scaled-up
+      shelter term saturates, so germination at canopy 0.8 is only ~0.94× that at 0.2 —
+      almost no selection differential to realise), while the only real pull — fertile
+      ground favouring cheap light seeding (~0.72×) — is a minority of tiles and gets
+      swamped by the grass bulk and drift. So tightening dispersal or steepening the
+      harshness gain doesn't help: there is little local selection *to* concentrate.
+      Realising the sort needs a structural change that puts a real, canopy-steep
+      fitness differential on harsh ground (a non-saturating harsh-side shelter term, or
+      the kin-structured public-good variant), not just a tuning pass — which is what the
+      sharpened follow-up below now calls for. `test/canopy-sort.test.mjs` covers the
+      bucketing at the reference, the two means and the signed sort against a hand
+      computation, the neutral fallback for a gene-less pellet, the null edges (no food,
+      a one-sided larder), and that the readout draws no rng.
+
 ## Next up
 
 - [ ] **UI/UX, continued.** Two passes have landed — a *creature inspector* and
@@ -1013,19 +1048,32 @@ population dynamics, natural selection, and surprising behaviour.
       `inheritRadius`, which spans a couple of terrain tiles and mixes barren and
       fertile lineages) plus drift swamp the gentle pull, so the standing larder's
       barren-vs-fertile mean canopy is noisy and near-flat. Close that gap so a walk
-      across the map shows visibly heavier canopy on barren ground. Levers, roughly
-      in order of cleanliness: (a) **tighter canopy dispersal** — shrink the
-      inheritance reach (or weight it toward the very nearest parent) so a lineage
-      stays in its patch long enough to adapt to it, without disturbing the global
-      selection equilibrium; (b) **a steeper local gradient** — let harshness fold in
-      the static microclimate stress and/or live grazing pressure (not just terrain
-      fertility) so the barren↔fertile optimum spread is wider than terrain alone
-      gives; (c) the deeper cut — **kin-structured canopy as a public good**, the
-      shelter benefit shared only among lineage neighbours (echoing the
+      across the map shows visibly heavier canopy on barren ground. The
+      **barren-vs-fertile readout is now in** (the `Canopy sort` row / `canopySort`
+      stat — see Done above), and it has already settled what *won't* work: a sweep of
+      the two cheap levers below (dispersal reach × harshness gain, plus a
+      neutral-reset fix) left the realised sort in the noise. The readout also
+      pinpointed *why*, which reorders the levers — the bottleneck is **not** dispersal
+      but the *shape of the selection on harsh ground*: the condition-dependent
+      shelter term scales the whole germination curve *up* on barren soil but
+      **saturates in canopy** there (germination at canopy 0.8 is ~0.94× that at 0.2),
+      so the barren optimum is real but has almost no gradient pulling plants to it.
+      So the cheap dispersal/gain knobs concentrate a selection signal that barely
+      exists. Reordered levers: (a) **a canopy-steep harsh-side differential** — make
+      the shelter benefit on harsh ground depend on canopy *non-saturatingly* (or
+      raise the fecundity cost specifically where it's benign) so high canopy is
+      meaningfully fitter than low *on barren soil*, not just globally higher — the
+      precondition the others all need; then (b) **tighter canopy dispersal** to keep
+      that now-real local adaptation in its patch (shrink `inheritRadius` / weight to
+      the very nearest parent, *without* the neutral-reset that washes a tight reach
+      back to the mean); and the deeper cut (c) **kin-structured canopy as a public
+      good** — the shelter benefit shared only among lineage neighbours (echoing the
       scent-signalling kinship work), so investment is defended against cheaters
-      patch-by-patch. Add a **barren-vs-fertile mean-canopy readout** to `stats()` /
-      the HUD so the divergence (or its absence) is legible while tuning. Or pick a
-      seed below.
+      patch-by-patch, which both steepens the differential and ties it to dispersal at
+      once. Watch the global equilibrium and the `canopy.test.mjs` curve assertions
+      while reshaping the harsh-side curve — keep the harshness-omitted
+      `canopyGermination(c)` call reproducing the old optimum so the established global
+      selection is preserved. Or pick a seed below.
 
 ## Ideas / someday
 

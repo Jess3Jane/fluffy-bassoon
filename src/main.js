@@ -144,6 +144,7 @@ function updateHud() {
     row("Climate sort", climateSortRow(s)),
     row("Biome", s.biomeSort == null ? "—" : s.biomeSort.toFixed(2)),
     row("Canopy", s.canopy == null ? "—" : s.canopy.toFixed(2)),
+    row("Canopy sort", canopySortRow(s)),
     divider(),
     row("Food voice", s.avg.foodVoice.toFixed(2)),
     row("Alarm voice", s.avg.alarmVoice.toFixed(2)),
@@ -186,6 +187,21 @@ function isolationRow(isolation) {
 function climateSortRow(s) {
   const fmt = (v) => (v == null ? "—" : v.toFixed(2));
   return `w ${fmt(s.climateSortWarmth)} / ${fmt(s.climateSortWetness)}`;
+}
+
+// The realised spatial canopy sort: the standing larder's mean canopy investment
+// on harsh (barren) ground vs. benign (fertile), and their difference. The
+// condition-dependent germination curve selects for *heavier* canopy where
+// seedlings struggle, so a positive difference means the larder has actually
+// sorted along that gradient. Shows the two means with the signed gap; "—" for an
+// empty bucket (no plants on that kind of ground yet).
+function canopySortRow(s) {
+  const fmt = (v) => (v == null ? "—" : v.toFixed(2));
+  const gap =
+    s.canopySort == null
+      ? "—"
+      : `${s.canopySort >= 0 ? "+" : ""}${s.canopySort.toFixed(2)}`;
+  return `${fmt(s.canopyHarsh)}/${fmt(s.canopyBenign)} (${gap})`;
 }
 
 // The wind reads as "Calm" until a storm actually stirs one up; once it blows,
