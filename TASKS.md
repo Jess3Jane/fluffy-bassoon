@@ -1374,21 +1374,64 @@ population dynamics, natural selection, and surprising behaviour.
       the browser: following a selected creature traces a clean fading path that
       reads its graze loops and wrap-arounds, no console errors.
 
+- [x] Minimap / world-overview thumbnail, so the zoomed-in camera stays
+      navigable. The pan/zoom camera lets a large world be explored up close, but
+      zooming in loses the global picture — which corner the inspected creature is
+      heading toward, where an off-screen boom or bust is happening. A small
+      overview now draws the *whole* world at a glance with the current viewport
+      outlined on it, and a click or drag jumps the camera anywhere on the map.
+      All the geometry is a set of pure functions in `src/minimap.js` so it's
+      unit-testable headlessly: `minimapSize` aspect-fits the thumbnail into a box
+      (the limiting axis touches, the other letterboxes, so a non-square world
+      reads true), `worldToMinimap` / `minimapToWorld` are the inverse world↔pixel
+      mappings, and `visibleWorldRect(view, …)` derives the visible world region
+      from the renderer's live camera transform (`screenX = offsetX + worldX·scale`)
+      and clamps it to the world bounds — so at zoom 1 the letterboxed view's
+      rectangle pins to the world and covers the whole thumbnail ("you're seeing
+      everything"), and zoomed in it's a centred `1/zoom` sub-window that tracks
+      pan/zoom live. The `Minimap` view class owns its own DOM canvas (kept clear
+      of the tool/camera pointer controllers that own the world canvas, so the
+      minimap gets its own click handling with no gesture contention), sizing the
+      backing bitmap to the world's aspect ratio and redrawing each frame: a dark
+      backdrop, every creature as a 1px dot coloured to match the main canvas's
+      active mode (diet hue in trophic, clade hue in lineage), the selected
+      creature's trail plotted on the overview as a faint polyline (split at the
+      toroidal seam with the *same* `trailSegments` the main trail uses, so a wrap
+      doesn't streak a false line) and a bright ring on the selection itself, then
+      the teal viewport rectangle on top. It's embedded in the HUD's left column
+      under the charts — like the charts, an overview canvas — rather than floated
+      in a corner, because every screen corner already has a full-height neighbour
+      (HUD left, inspector right) it would collide with; sitting in the HUD it
+      never overlaps anything and matches the charts' dark rounded styling.
+      Click-or-drag-to-navigate (`main.js`) maps the clicked thumbnail pixel back
+      to a world point the camera centres on, with pointer capture so a drag keeps
+      steering even off the small canvas, and — like any deliberate pan — it
+      releases "follow" so grabbing the minimap always wins over the per-frame
+      re-centring. Purely a *view* feature: no rng, no simulation touch, nothing
+      serialized (no `SAVE_VERSION` bump), so the headless suite stays green.
+      `test/minimap.test.mjs` covers the aspect-fit (wide/tall/square worlds, the
+      box defaults), the world↔pixel mappings and their exact round-trip, and the
+      viewport rectangle cross-checked against the real `Camera` (full-world at
+      zoom 1, a centred `1/zoom` sub-window when zoomed about the centre, and the
+      pin-to-edge clamp when panned hard into a corner). Verified in the browser:
+      the overview shows the live population and a viewport box that shrinks as you
+      zoom and jumps as you click it, the main view recentres to match, no console
+      errors.
+
 ## Next up
 
-- [ ] **UI/UX, continued.** Eight passes have now landed — a *creature inspector*,
+- [ ] **UI/UX, continued.** Nine passes have now landed — a *creature inspector*,
       a *pan/zoom camera*, *collapsible stat groups*, a *follow-selected camera
       mode*, an *in-app legend*, *click-through inspector links*, *smooth zoom
-      easing*, and now a *creature trail* (all below). The camera follow-ups (b)
-      through (e) are done; the camera feel is rounded out, and the trail now
-      traces the inspected individual's path over time. Open directions for the
-      next UI pass, if picked: a *minimap* / world-overview thumbnail (the
-      zoomed-in view loses the global picture — a corner minimap showing the whole
-      world with the current viewport rectangle would let you navigate a large
-      world without zooming out — and it would pair naturally with the new trail,
-      plotting the selected creature's track on the overview too), or a
-      *time-series scrubber* / pause-and-step controls (single-step the fixed
-      timestep to study a moment frame by frame).
+      easing*, a *creature trail*, and now a *minimap* / world-overview thumbnail
+      (all below). The minimap closes the "zoomed-in view loses the global picture"
+      gap: it shows the whole world with the live viewport rectangle and the
+      selected creature's track, and clicking it jumps the camera anywhere. Open
+      direction for the next UI pass, if picked: a *time-series scrubber* /
+      pause-and-step controls (single-step the fixed timestep to study a moment
+      frame by frame), or a *heatmap overlay* on the minimap (population density /
+      kill sites / scent intensity binned across the world, so off-screen hotspots
+      read at a glance rather than only the dot scatter).
 - [ ] **Widen the realised canopy sort further — explicit metapopulation structure.**
       The kin-structured pass below lifted the *mean* realised sort modestly (~+25%)
       and stabilised the world, but per-seed the sort is still swamped by terrain

@@ -13,6 +13,7 @@ import { Charts } from "./charts.js";
 import { saveWorld, loadWorld, hasSavedWorld } from "./persistence.js";
 import { ToolController, TOOLS, TOOL_LABELS } from "./tools.js";
 import { Trail } from "./trail.js";
+import { Minimap } from "./minimap.js";
 import { renderLegend } from "./legend.js";
 import { phaseLabel } from "./daycycle.js";
 import { kindLabel } from "./plants.js";
@@ -25,6 +26,7 @@ const canvas = document.getElementById("world");
 const camera = new Camera();
 const renderer = new Renderer(canvas, camera);
 const charts = new Charts(document.getElementById("charts"));
+const minimap = new Minimap(document.getElementById("minimap-canvas"), camera, renderer);
 
 let world;
 let history;
@@ -121,6 +123,9 @@ function loop(now) {
   }
 
   renderer.draw(world);
+  // The minimap reads the renderer's just-resolved transform for its viewport
+  // rectangle, so draw it after the main view each frame.
+  minimap.draw(world, selected, trail);
   updateHud();
   updateInspector(selected);
   drawCharts();
@@ -646,6 +651,42 @@ document
   .getElementById("zoom-out")
   .addEventListener("click", () => cameraControls.zoomCentre(1 / CAMERA_BUTTON_STEP));
 document.getElementById("zoom-reset").addEventListener("click", () => camera.reset());
+
+// --- Minimap navigation ---
+//
+// Click or drag the overview to jump the main view there: the clicked point on
+// the thumbnail maps back to a world point the camera centres on. Like any
+// deliberate pan it releases "follow", so grabbing the minimap always wins over
+// the per-frame re-centring. Drag (pointer held) keeps re-centring so you can
+// sweep the view across the world; pointer capture keeps the drag alive even if
+// the cursor slips off the small thumbnail.
+const minimapCanvas = document.getElementById("minimap-canvas");
+
+function navigateMinimap(clientX, clientY) {
+  const p = minimap.clientToWorld(clientX, clientY, world.width, world.height);
+  if (!p) return;
+  if (follow) setFollow(false);
+  cameraControls.centerOn(p.x, p.y);
+}
+
+let minimapDragId = null;
+minimapCanvas.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  minimapDragId = e.pointerId;
+  minimapCanvas.setPointerCapture?.(e.pointerId);
+  navigateMinimap(e.clientX, e.clientY);
+});
+minimapCanvas.addEventListener("pointermove", (e) => {
+  if (minimapDragId === e.pointerId) navigateMinimap(e.clientX, e.clientY);
+});
+function endMinimapDrag(e) {
+  if (minimapDragId === e.pointerId) {
+    minimapDragId = null;
+    minimapCanvas.releasePointerCapture?.(e.pointerId);
+  }
+}
+minimapCanvas.addEventListener("pointerup", endMinimapDrag);
+minimapCanvas.addEventListener("pointercancel", endMinimapDrag);
 
 // --- Boot ---
 
