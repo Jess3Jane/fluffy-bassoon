@@ -70,8 +70,12 @@ const MAX_CREATURE_RADIUS = CONFIG.creature.radius * GENES.size[1];
 // `canopyAmp` — how strongly that plant shapes its understory microclimate (the
 // vegetation feedback's strength, now an evolving trait): a pre-v12 pellet lacks
 // it, so its lean vote and the fecundity tax read from it would be undefined —
-// better to reject the save than rebuild the field off a NaN.
-const SAVE_VERSION = 12;
+// better to reject the save than rebuild the field off a NaN. v13 added a per-pellet
+// neutral `lineage` tag (gating the kin-structured withering) plus the
+// `nextPlantLineage` counter that mints fresh ones: a pre-v13 pellet has no lineage,
+// and a restored pioneer minted off a zeroed counter could collide with a saved
+// lineage — reject the save rather than load it with tangled kin groups.
+const SAVE_VERSION = 13;
 
 export class World {
   // `seed: false` builds an empty world (no starting food/creatures, rng
@@ -94,6 +98,15 @@ export class World {
     this.canopyGrid = new SpatialGrid(this.width, this.height, CONFIG.spatial.cellSize);
 
     this.foodSpawnAccumulator = 0;
+    // Monotonic source of plant *lineage* tags: a pioneer (a sprout with no plant in
+    // canopy-inheritance reach) founds a fresh lineage by taking the next integer,
+    // and every sprout off an existing plant inherits its parent's tag verbatim. The
+    // tag is neutral (it shapes nothing on its own) and drawn from a counter, not the
+    // rng, so it never perturbs the deterministic stream; it gates the kin-structured
+    // canopy shelter (`kinDensityAt`) — heavy canopy is rewarded on barren ground only
+    // where same-lineage neighbours cluster. Serialized so restored pioneers don't
+    // collide with saved lineages.
+    this.nextPlantLineage = 0;
     this.time = 0;
     this.births = 0;
     this.deaths = 0;
@@ -207,19 +220,30 @@ export class World {
         const dw = this.warmthOffsetAt(px, py);
         const dm = this.wetnessOffsetAt(px, py);
         const kind = plantKindAt(px, py, kindClimateBias(dw, dm));
-        // The nearest same-kind parent's canopy investment shapes this sprout's
-        // germination: a fecundity cost (canopy diverts from seed) against a
-        // facilitation benefit (the parent's canopy shelters its seedlings), so an
-        // interior investment is favoured (`canopyGermination`). Read off the
-        // vegetation field rebuilt at the step boundary, so it's deterministic and
-        // rebuilds identically from a restored save.
-        const localCanopy = this.parentCanopyAt(px, py, kind);
+        // The nearest parent plant shapes this sprout: it inherits the parent's
+        // canopy investment (mutated) and its *lineage* tag. Germination weighs a
+        // fecundity cost on that investment against the facilitation (shelter) benefit
+        // (`canopyGermination`, the established curve — the kin structure lives in the
+        // withering pass, not here, so it can't bloom barren ground into a food
+        // magnet). Read off the vegetation field rebuilt at the step boundary, so it's
+        // deterministic and rebuilds identically from a restored save.
+        const parent = this.parentPlantAt(px, py, kind);
+        const localCanopy = parent
+          ? parent.canopyAmp ?? CONFIG.vegetation.canopy.neutral
+          : CONFIG.vegetation.canopy.neutral;
+        const parentLineage = parent ? parent.lineage : undefined;
         const fertility =
           this.terrain.fertilityAt(px, py) *
           kindFertilityFactor(kind, dw, dm) *
           canopyGermination(localCanopy, this.canopyHarshnessAt(px, py));
         if (this.rng.chance(fertility)) {
-          const f = { x: px, y: py, kind, canopyAmp: inheritCanopy(localCanopy, this.rng) };
+          const f = {
+            x: px,
+            y: py,
+            kind,
+            canopyAmp: inheritCanopy(localCanopy, this.rng),
+            lineage: parentLineage ?? this.nextPlantLineage++,
+          };
           this.food.push(f);
           return f;
         }
@@ -234,7 +258,17 @@ export class World {
     const dw = this.warmthOffsetAt(x, y);
     const dm = this.wetnessOffsetAt(x, y);
     const kind = plantKindAt(x, y, kindClimateBias(dw, dm));
-    const f = { x, y, kind, canopyAmp: inheritCanopy(this.parentCanopyAt(x, y, kind), this.rng) };
+    const parent = this.parentPlantAt(x, y, kind);
+    const localCanopy = parent
+      ? parent.canopyAmp ?? CONFIG.vegetation.canopy.neutral
+      : CONFIG.vegetation.canopy.neutral;
+    const f = {
+      x,
+      y,
+      kind,
+      canopyAmp: inheritCanopy(localCanopy, this.rng),
+      lineage: (parent ? parent.lineage : undefined) ?? this.nextPlantLineage++,
+    };
     this.food.push(f);
     return f;
   }
@@ -266,7 +300,7 @@ export class World {
   // copying a near off-kind neighbour's investment keeps a patch's local adaptation
   // intact across a kind boundary far better than resetting to neutral — a hard reset
   // would wash a tight reach straight back to the mean.
-  parentCanopyAt(x, y, kind) {
+  parentPlantAt(x, y, kind) {
     const radius = CONFIG.vegetation.canopy.inheritRadius;
     let best = null;
     let bestD = radius * radius;
@@ -284,8 +318,37 @@ export class World {
         best = f;
       }
     });
-    const parent = best ?? anyBest;
+    return best ?? anyBest;
+  }
+
+  // The canopy investment a sprout at (x, y) inherits — a thin wrapper over
+  // `parentPlantAt` returning just the parent's `canopyAmp` (neutral if none in
+  // reach). Kept as the single-value accessor the canopy tests pin.
+  parentCanopyAt(x, y, kind) {
+    const parent = this.parentPlantAt(x, y, kind);
     return parent ? parent.canopyAmp ?? CONFIG.vegetation.canopy.neutral : CONFIG.vegetation.canopy.neutral;
+  }
+
+  // The kin gate at (x, y) for a plant of lineage `lineage`, in [0, 1]: how densely
+  // its *same-lineage* neighbours cluster around it — the count of live same-lineage
+  // plants within `kinDensityRadius`, saturated against `kinDensityNorm`. This gates
+  // the kin-structured withering (`World.update`): where it reads high, the cull of a
+  // canopy *mismatched to its ground* is amplified by `1 + kinWitherSharpen · gate`, so
+  // a kin stand purifies onto its local canopy optimum while a lone stranger (gate 0)
+  // or a tagless legacy/test pellet sees the plain withering. Reads the step-boundary
+  // `canopyGrid` and draws no rng, so it replays bit-for-bit across save/load.
+  kinDensityAt(x, y, lineage) {
+    const cfg = CONFIG.vegetation.canopy;
+    if (lineage === undefined || lineage === null) return 0;
+    const radius = cfg.kinDensityRadius;
+    const r2 = radius * radius;
+    let n = 0;
+    this.canopyGrid.forEachNear(x, y, radius, (f) => {
+      if (f.dead || f.lineage !== lineage) return;
+      if (wrapDistSq(x, y, f.x, f.y, this.width, this.height) > r2) return;
+      n++;
+    });
+    return Math.min(1, n / cfg.kinDensityNorm);
   }
 
   // How hard a spot is for a seedling, in [0, 1] (0 benign → 1 harsh) — the local
@@ -589,11 +652,17 @@ export class World {
       if (rate > 0) {
         for (const f of this.food) {
           if (f.dead) continue;
-          const v = canopyViability(
-            f.canopyAmp ?? CONFIG.vegetation.canopy.neutral,
-            this.canopyHarshnessAt(f.x, f.y),
-          );
-          if (this.rng.chance(rate * (1 - v))) f.dead = true;
+          const own = f.canopyAmp ?? CONFIG.vegetation.canopy.neutral;
+          const v = canopyViability(own, this.canopyHarshnessAt(f.x, f.y));
+          // Kin-structured selection intensity: where this plant's lineage clusters
+          // densely, amplify the cull pressure on a canopy mismatched to its ground
+          // (a well-matched plant has v = 1, so `1 − v` = 0 and it never withers
+          // however dense its kin). This purifies a barren kin stand onto heavy canopy
+          // and a benign one onto light — widening the realised sort — while only ever
+          // *removing* the mismatched, so it can't bloom barren ground. A lone stranger
+          // (gate 0) sees the plain withering. Off at `kinWitherSharpen` 0.
+          const kinSharpen = 1 + CONFIG.vegetation.canopy.kinWitherSharpen * this.kinDensityAt(f.x, f.y, f.lineage);
+          if (this.rng.chance(rate * (1 - v) * kinSharpen)) f.dead = true;
         }
       }
     }
@@ -930,8 +999,9 @@ export class World {
       foodSpawnAccumulator: this.foodSpawnAccumulator,
       terrainSeed: this.terrainSeed,
       microclimateSeed: this.microclimateSeed,
+      nextPlantLineage: this.nextPlantLineage,
       rngState: this.rng.getState(),
-      food: this.food.filter((f) => !f.dead).map((f) => [f.x, f.y, f.kind, f.canopyAmp]),
+      food: this.food.filter((f) => !f.dead).map((f) => [f.x, f.y, f.kind, f.canopyAmp, f.lineage]),
       creatures: this.creatures.filter((c) => c.alive).map((c) => c.serialize()),
       scent: this.scent.serialize(),
       matingRing: this.matingRing.slice(),
@@ -963,12 +1033,18 @@ export class World {
     world.microclimateSeed = data.microclimateSeed >>> 0;
     world.microclimate = new Microclimate(world.width, world.height, world.microclimateSeed);
 
-    world.food = data.food.map(([x, y, kind, canopyAmp]) => ({
+    world.food = data.food.map(([x, y, kind, canopyAmp, lineage]) => ({
       x,
       y,
       kind: kind === 1 ? 1 : 0,
       canopyAmp: canopyAmp ?? CONFIG.vegetation.canopy.neutral,
+      lineage: lineage ?? undefined,
     }));
+    // Restore the lineage counter so freshly-founded pioneers don't collide with the
+    // saved lineages; fall back to one past the largest restored tag for safety.
+    world.nextPlantLineage =
+      data.nextPlantLineage ??
+      world.food.reduce((m, f) => (typeof f.lineage === "number" && f.lineage >= m ? f.lineage + 1 : m), 0);
     world.scent = ScentField.deserialize(data.scent, world.width, world.height);
     // The isolation window is pure readout state, so an older save that predates
     // it loads with an empty ring (the read just refills as breeding resumes)

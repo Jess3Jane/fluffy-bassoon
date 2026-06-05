@@ -1237,6 +1237,69 @@ population dynamics, natural selection, and surprising behaviour.
       kin pointed back, a mutual nearest pair); and watching the running world caught a
       carnivore with a live **Target → #id** link to the prey it was chasing.
 
+- [x] **Kin-structured canopy: a neutral plant lineage marker and kin-sharpened
+      withering that widens the realised spatial canopy sort.** The spatial sort was
+      *realised* by viability withering (above) but sat at a modest, gap-capped +0.045;
+      the seed asked to widen it by making canopy shelter a *public good shared only
+      among lineage neighbours*. The lasting addition is a **neutral plant `lineage`
+      tag** (`src/world.js`): an integer a *pioneer* sprout (one with no plant in
+      canopy-inheritance reach) founds from a monotonic `nextPlantLineage` counter, and
+      every other sprout inherits from its canopy parent verbatim — the plant-world
+      echo of a creature's `lineageHue`. It's drawn from a **counter, not the rng**, so
+      it perturbs the deterministic stream not at all (every prior replay test passes
+      untouched); it rides the food tuple as a 5th slot and the counter serializes, so a
+      restored world's pioneers don't collide with saved lineages (`SAVE_VERSION` → 13;
+      food now `[x, y, kind, canopyAmp, lineage]`, a pre-v13 pellet lacking the tag is
+      rejected). On top of it, the lever that actually moved the sort: **kin-structured
+      withering**. `World.kinDensityAt(x, y, lineage)` reads how densely a plant's
+      *same-lineage* neighbours cluster around it (count within `kinDensityRadius`,
+      saturated against `kinDensityNorm`, in [0, 1]); the withering pass then amplifies
+      the cull chance of a canopy *mismatched to its ground* by `1 + kinWitherSharpen ·
+      kinGate`, so where a lineage clusters densely a barren kin stand purifies onto its
+      (heavy) local optimum and a benign one onto its (light) optimum — widening the
+      realised harsh-vs-benign gap. A well-matched plant has viability 1, so `1 − v` = 0
+      and it never withers however dense its kin: the amplification only ever bites the
+      genuinely mis-invested, and a lone stranger (gate 0) sees the plain pass. The gate
+      reads the step-boundary `canopyGrid` and adds no fresh rng path, so a restored
+      world still replays bit-for-bit; the germination curve (`canopyGermination` /
+      `canopyViability`) is **left untouched**, so every prior canopy curve/recovery/
+      sort assertion holds and at `kinWitherSharpen` 0 the world is identical to before.
+      *Getting here meant rejecting the seed's own literal recipe — twice — and the two
+      failures are the real lesson:* (a) a **pooled received-shelter public good** (a
+      plant sheltered by the mean canopy of its kin) *erodes the own-canopy commons* — a
+      cheat free-rides on its neighbours, so investment, and the sort, collapse; a paired
+      12-seed × 15-min sweep found it *narrowed* the sort (0.046 → 0.036) and tipped a
+      seed extinct. (b) A **kin-gated harsh-side shelter *bonus*** (heavy canopy worth
+      more on barren ground where kin cluster) *adds survival on barren ground*, which
+      blooms it into a food magnet, raises kin density everywhere, saturates the gate,
+      and collapses the very discrimination it meant to sharpen — sort 0.043 → 0.016 with
+      2 extinctions. The unifying diagnosis: **any lever that *adds* survival on barren
+      ground triggers a productivity-bloom feedback**, so the working lever must instead
+      *remove* the mismatched (competition-neutral — total food only falls, never blooms)
+      and act on each plant's *own* viability (no commons to erode). Kin-sharpened
+      withering is exactly that. The payoff, across **24 seeds × 15 min** (two independent
+      12-seed sets): it lifts the *mean* realised `canopySort` modestly but consistently
+      — in-sample 0.043 → 0.054, out-of-sample 0.032 → 0.040 (~+25%), all 24 seeds
+      positive — and, a welcome surprise, **eliminated extinctions (0/24 vs the base
+      world's 2/24)**: the kin-purified larder stays better-adapted and less crash-prone,
+      with the same healthy boom/bust band (peaks to ~370, active predation ~200–1500
+      kills) intact. The honest caveat: *per-seed* the sort is still dominated by terrain
+      layout and dynamics noise (a mean shift, not a uniform per-seed win), so the
+      realised widening stays modest — confirming the prior seed's read that the sort is
+      gene-flow/dispersal-limited; the sharpened follow-up above (explicit metapopulation
+      structure) is what a larger per-seed gap would need. The renderer needs no change
+      (its amber/blue climate wash already breathes with the canopy feedback).
+      `test/canopy-kin.test.mjs` covers the curve staying the established two-arg one (a
+      stray third arg ignored), `kinDensityAt` (tagless/null → 0, the saturating
+      same-lineage count, strangers excluded, the radius cutoff, no rng), lineage
+      inheritance through `spawnFood` (a sprout inherits its parent's tag, a pioneer
+      founds the next, the counter advancing only on pioneer births), the withering
+      wiring (a mismatched kin stand culled harder than lone strangers of the same
+      canopy, a well-matched stand spared however dense its kin, the off-at-`sharpen` 0
+      identity), and the v13 save round-trip (tag + counter preserved, bit-identical
+      replay); the existing `canopy*.test.mjs` curve/recovery/sort assertions and the
+      five version-assert tests (bumped 12 → 13) all still hold.
+
 ## Next up
 
 - [ ] **UI/UX, continued.** Six passes have landed — a *creature inspector*, a
@@ -1247,27 +1310,20 @@ population dynamics, natural selection, and surprising behaviour.
       centred as it moves) and the click-through links (which *select-and-follow*
       a related creature in one hop) have landed; eased wheel/button zoom would
       round out the camera feel.
-- [ ] **Widen the realised canopy sort — kin-structured canopy as a public good.**
-      The spatial sort is now *realised* (above): viability withering pulls barren
-      stands onto heavy canopy and fertile stands onto light, a robust +0.045 across
-      every seed. But the gap is modest, capped by how close the two ground types'
-      optima sit (~0.51 barren vs ~0.33 grass) — and the one cheap way to push them
-      apart (a benign-side fecundity tilt) starves the world, as found above. The
-      deeper cut the prior seed flagged is still open and is the natural next step:
-      make the canopy shelter benefit a **public good shared only among lineage
-      neighbours** (echoing the scent/kin-signalling work — `kinship`,
-      `hueSimilarity`). Today a plant's canopy shelters *any* seedling germinating
-      nearby (and, via withering, only its own viability depends on its canopy); tie
-      the *facilitation* term to whether the sheltering stand is kin, so heavy canopy
-      pays off only where relatives cluster. That defends investment against free-
-      riders patch-by-patch and ties the differential to dispersal at once, which
-      should both steepen the harsh-side selection (a non-saturating, kin-gated shelter
-      that can climb higher without starving strangers' ground) and let the barren
-      optimum diverge further from the benign one without taxing the global larder.
-      Watch the global equilibrium and the `canopy*.test.mjs` curve/recovery
-      assertions while reshaping the shelter term — keep the kin-free /
-      harshness-omitted `canopyGermination(c)` call reproducing the old optimum so the
-      established global selection is preserved. Or pick a seed below.
+- [ ] **Widen the realised canopy sort further — explicit metapopulation structure.**
+      The kin-structured pass below lifted the *mean* realised sort modestly (~+25%)
+      and stabilised the world, but per-seed the sort is still swamped by terrain
+      layout and boom/bust dynamics — a mean shift, not a clean per-seed win. Three
+      kin-shelter shapes were tried and the two "add survival on barren ground" ones
+      both backfired (see the Done entry); the working lever was *competition-neutral*
+      (sharpen withering, never bloom). The honest read is that the realised sort is
+      capped by **gene flow between patches** more than by the selection target. A
+      genuinely larger per-seed widening probably needs explicit metapopulation
+      structure — episodic local extinctions/recolonisations (a patch wiped by a
+      grazing front reseeded from one disperser), or a dispersal-distance gene that
+      lets barren lineages stay put — so a barren kin stand can fix heavy canopy
+      against immigration rather than being continually diluted. That's a structural
+      change, not a tuning pass, matching the prior finding. Or pick a seed below.
 
 ## Ideas / someday
 

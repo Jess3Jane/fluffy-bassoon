@@ -41,6 +41,20 @@
 // population evolves the gain toward an interior optimum and defends it against
 // drift, rather than the config fixing it. The helpers for that selection live
 // here; the field math above only *reads* the resulting per-plant investment.
+//
+// On top of that balance, the *withering* that realises the spatial sort is now
+// **kin-structured**: where a plant's lineage kin cluster densely (`World.kinDensityAt`),
+// the wither pressure on a canopy *mismatched to its ground* is amplified, so a barren
+// kin stand purifies onto its (heavy) local optimum faster and a benign one onto its
+// (light) optimum — widening the realised harsh-vs-benign gap. Crucially this lever
+// *removes* mismatched plants rather than *adding* survival: it can't bloom barren
+// ground into a food magnet (the failure mode of a shelter *bonus*, which inflated
+// viability, saturated every gate, and collapsed the very discrimination it meant to
+// sharpen). A well-matched plant (viability 1) never withers however dense its kin, so
+// the amplification only bites the *mis*-invested; a lone stranger (gate 0) sees the
+// plain curve. The selection-intensity lever lives in `World.update`'s withering pass,
+// not the germination curve — so `canopyGermination` / `canopyViability` are the
+// established functions, unchanged.
 
 import { CONFIG } from "./config.js";
 import { sampleField } from "./terrain.js";
@@ -54,9 +68,11 @@ import { clamp01 } from "./math.js";
 //   • a *fecundity cost*, linear and falling — building canopy diverts from seed,
 //     so heavier investers germinate less (`1 − fecundityCost·c`), favouring cheap
 //     light-touch seeding; floored at 0 so it can't go negative.
-//   • a *facilitation benefit*, saturating and rising — a parent's own canopy
-//     shelters its seedlings (`1 + facilitation·tanh(facilitationSlope·c)`), a
-//     private return with diminishing marginal value, favouring investment.
+//   • a *facilitation benefit*, saturating and rising — a plant's own canopy shelters
+//     its seedlings (`1 + facilitation·tanh(facilitationSlope·c)`), a private return
+//     with diminishing marginal value, favouring investment. On barren ground the
+//     kin-structured public good adds a further, kin-gated bonus on top (see the header
+//     note and `World.kinDensityAt`).
 // Their product is monotone-up where the ramping shelter outweighs the linear tax
 // and monotone-down once the tax wins, so germination peaks at an interior canopy
 // the population evolves toward and defends against drift — the feedback's gain is
@@ -101,13 +117,13 @@ export function canopyGermination(c, harshness = CONFIG.vegetation.canopy.harshn
   // curve), benign makes it worth less. Clamped ≥ 0 so an extreme-benign spot zeroes
   // the benefit rather than inverting it into a shelter *penalty*.
   const facScale = Math.max(0, 1 + cfg.harshnessGain * (harshness - cfg.harshnessRef));
-  const shelter =
+  const shelterMult =
     1 +
     cfg.facilitation * facScale * Math.tanh(cfg.facilitationSlope * c) +
     // Non-saturating harsh-side bonus: keeps high canopy gaining shelter on barren
     // soil past where the tanh flattens, so the harsh curve is steep (not just tall).
     cfg.harshShelterLinear * harshExcess * c;
-  return fecundity * shelter;
+  return fecundity * shelterMult;
 }
 
 // The peak germination achievable at a given harshness (the value at the local
