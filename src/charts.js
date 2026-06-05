@@ -1,7 +1,8 @@
 // Tiny sparkline charts for the HUD, drawn straight to a canvas. Four stacked
 // panels read out of a History ring: population over time (with the carnivore
-// sub-band), the average-trait drift (diet, forage and hunt, plus speed/size
-// normalised to their gene ranges so they share a 0–1 axis), the speciation count (distinct
+// sub-band), the average-trait drift (diet, forage and hunt, the warmth/wetness
+// climate preferences, plus speed/size normalised to their gene ranges so they
+// share a 0–1 axis), the speciation count (distinct
 // lineage-hue clades alongside the ecological count clustered on the adaptive
 // genome), and realised reproductive isolation (the within-lineage share of
 // recent sexual matings). Together they
@@ -60,6 +61,8 @@ export class Charts {
       { color: "#e2664f", label: "diet", values: s.map((d) => d.diet) },
       { color: "#7d6fb0", label: "forage", values: s.map((d) => d.forage ?? 0.5) },
       { color: "#e58fb5", label: "hunt", values: s.map((d) => d.hunt ?? 0.5) },
+      { color: "#f0a36f", label: "warm", values: s.map((d) => d.warmthPref ?? 0.5) },
+      { color: "#6fd3e0", label: "wet", values: s.map((d) => d.wetnessPref ?? 0.5) },
       { color: "#8fb3ff", label: "speed", values: s.map((d) => normTrait("speed", d.speed)) },
       { color: "#d9b25f", label: "size", values: s.map((d) => normTrait("size", d.size)) },
     ]);

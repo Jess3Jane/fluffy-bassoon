@@ -95,6 +95,22 @@ export const GENES = {
   // to nearest. This is the sexual-selection counterpart to the `mating` gene:
   // `mating` sets *whether* to mix genes, `mateChoice` sets *with whom*.
   mateChoice: [0.0, 1.0], // assortative (>0.5) ↔ disassortative (<0.5) mate preference
+
+  // Climate tolerance: a creature's preferred point on the two slow climate axes
+  // the world already swings along — warmth (the season) and wetness (the
+  // weather), each folded onto [0, 1]. These don't change how it senses or
+  // moves; they set the climate it is *built for*. Living away from that point
+  // costs energy: `climateStress` measures how far the current climate has
+  // drifted from the preferred warmth/wetness, and base metabolism rises with it
+  // (`creature.climateStressCost`). So the season and weather stop being only a
+  // larder modulator and become a selective axis on the animals themselves —
+  // winters cull the summer-adapted, droughts the rain-adapted. And because the
+  // two plant kinds carry their own opposite climate leans (sunleaf thrives in
+  // summer rain, moonleaf in winter drought), a clade is pulled to match its
+  // tolerance to the climate where its forage actually pays — coupling these
+  // genes to `forage` rather than leaving them to drift freely.
+  warmthPref: [0.0, 1.0], // preferred seasonal warmth (0 = cold/winter ↔ 1 = warm/summer)
+  wetnessPref: [0.0, 1.0], // preferred weather wetness (0 = dry/drought ↔ 1 = wet/storm)
 };
 
 export function randomGenome(rng) {
@@ -184,6 +200,24 @@ export function huntYield(hunt, preySize) {
   const match = 1 - Math.abs(hunt - sizeN);
   const eff = Math.pow(match, CONFIG.creature.huntExponent);
   return eff >= CONFIG.creature.huntMinEff ? eff : 0;
+}
+
+// Metabolic climate stress for a creature with these warmth/wetness preferences
+// under the current climate — `warmth` and `wetness` each on the [0, 1] axes
+// (warmth = the season, wetness = the weather). It is the squared drift of the
+// present climate from the creature's preferred point, in [0, 2], and the single
+// source of truth for how badly a creature is mismatched to the weather it finds
+// itself in: `Creature.update` turns it into a base-metabolism multiplier
+// (`1 + climateStressCost · stress`), so a creature sitting in its preferred
+// climate pays nothing extra while one stranded far from it — a summer-adapted
+// body in deep winter, a rain-adapted one in a drought — burns energy faster.
+// Squared (rather than linear) so a small mismatch is nearly free and the cost
+// climbs steeply only as the climate strays well off the preferred point, which
+// keeps everyday seasonal drift a gentle tax and the extremes the real cull.
+export function climateStress(warmthPref, wetnessPref, warmth, wetness) {
+  const dw = warmth - warmthPref;
+  const dm = wetness - wetnessPref;
+  return dw * dw + dm * dm;
 }
 
 // Map a genome to a hue so a creature's trophic role is visible at a glance:

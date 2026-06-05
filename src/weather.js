@@ -96,6 +96,30 @@ export function weatherLabel(time) {
   return "Clear";
 }
 
+// --- Climate axes (for tolerance selection) ------------------------------
+//
+// The season and weather each define an axis the animals can adapt *to*, not
+// just feed off — warmth (the season) and wetness (the weather) — both folded
+// onto [0, 1] so a creature's heritable `warmthPref` / `wetnessPref` genes live
+// on the same scale. These are the canonical climate readouts the metabolic
+// climate-stress (`genome.climateStress`) reads, so the two slow rhythms select
+// on creatures directly and not only through the larder they modulate.
+
+// Current seasonal warmth in [0, 1]: 1 at midsummer, 0 at midwinter — the
+// climate-tolerance layer's name for `seasonLevel`.
+export function climateWarmth(time) {
+  return seasonLevel(time);
+}
+
+// Current weather wetness in [0, 1]: 0 in the deepest drought, ~0.5 in fair
+// weather, 1 at the height of a storm — the weather noise folded onto the full
+// [0, 1] axis. (Distinct from the half-wave `wetness` below, which keeps only
+// the wet side for the rain-only behavioural effects; this is the symmetric
+// axis a creature's wetness preference is judged against.)
+export function climateWetness(time) {
+  return (weatherNoise(time) + 1) / 2;
+}
+
 // --- Behavioural effects -------------------------------------------------
 //
 // Weather reaches past the larder into how creatures move and sense. Only the

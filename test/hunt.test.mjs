@@ -191,7 +191,7 @@ function meatGain(huntGene, preySizeN) {
   const world = new World(makeRng(77));
   for (let i = 0; i < 120; i++) world.update(1 / 60);
   const blob = JSON.parse(JSON.stringify(world.serialize()));
-  assert.equal(blob.version, 9, "snapshot carries SAVE_VERSION 9");
+  assert.equal(blob.version, 10, "snapshot carries the current SAVE_VERSION");
   const restored = World.deserialize(blob, makeRng());
   assert.deepEqual(
     restored.creatures.map((c) => c.genome.hunt),
