@@ -107,6 +107,11 @@ const seasonYear = CONFIG.weather.seasonSeconds;
 const dt = 1 / 60;
 function stepOne({ warmthPref, wetnessPref, time = 0, seed = 9, genomeSeed = 123 }) {
   const world = new World(makeRng(seed), { seed: false });
+  // Neutralise the spatial microclimate so these assertions isolate the *global*
+  // climate-tolerance formula — the spatial offset is covered by its own test.
+  // Zeroing the amplitudes makes every position read the global level exactly.
+  world.microclimate.warmthAmp = 0;
+  world.microclimate.wetnessAmp = 0;
   world.time = time;
   const g = randomGenome(makeRng(genomeSeed));
   g.diet = 0; // a grazer: no hunting, and with no food around no feeding either
@@ -205,7 +210,7 @@ function stepOne({ warmthPref, wetnessPref, time = 0, seed = 9, genomeSeed = 123
   const world = new World(makeRng(77));
   for (let i = 0; i < 120; i++) world.update(dt);
   const blob = JSON.parse(JSON.stringify(world.serialize()));
-  assert.equal(blob.version, 10, "snapshot carries SAVE_VERSION 10");
+  assert.equal(blob.version, 11, "snapshot carries SAVE_VERSION 11");
 
   const restored = World.deserialize(blob, makeRng());
   assert.deepEqual(
@@ -233,11 +238,11 @@ function stepOne({ warmthPref, wetnessPref, time = 0, seed = 9, genomeSeed = 123
   assert.ok(close(checksum(world), checksum(restored), 1e-6), "restored world replays bit-identically");
 
   const stale = JSON.parse(JSON.stringify(world.serialize()));
-  stale.version = 9;
+  stale.version = 10;
   assert.throws(
     () => World.deserialize(stale, makeRng()),
     /unsupported save version/,
-    "a pre-v10 save is rejected rather than loaded with NaN-stressed creatures",
+    "a pre-v11 save is rejected rather than loaded with a NaN-offset microclimate",
   );
 }
 

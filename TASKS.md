@@ -689,17 +689,56 @@ population dynamics, natural selection, and surprising behaviour.
       (genes preserved, a pre-v10 save rejected, the restored world replaying
       bit-identically).
 
+- [x] Climate gained a *spatial* axis: a per-region **microclimate**
+      (`src/microclimate.js`) layered under the global season/weather clock. Where
+      the season and weather move the whole map up and down the warmth/wetness axes
+      *together over time*, the microclimate is the orthogonal half — a static,
+      per-region *offset* that makes one corner run warmer or drier than another at
+      the very same instant (a sun-baked, dry south; a cool, damp north). It's two
+      independent wrapping value-noise fields grown once from a seed with the same
+      seamless-noise machinery as the terrain (`noiseField`/`sampleField`, now
+      exported), on a deliberately coarse lattice so it carves broad regional
+      patches rather than fine speckle. Generation runs on its own internal rng, so
+      it never perturbs the simulation stream, and — like the terrain — the field
+      itself is never stored, only the seed that regrows it bit-for-bit
+      (`SAVE_VERSION` → 11; a pre-v11 save lacks the seed, so its local climate
+      would be NaN-offset, and is rejected). The payoff is selection *across space*:
+      `Creature.update` now taxes a creature against its **local** climate — the
+      global `climateWarmth`/`climateWetness` *plus* the microclimate offset at its
+      position, clamped back onto `[0,1]` (new `clamp01` in `src/math.js`) — so the
+      same `warmthPref`/`wetnessPref` genes that tracked the year now also partition
+      the population over the map, a warm-adapted clade pulled to settle the warm
+      regions while a cold-adapted one holds the cool ones. It draws **no rng** once
+      grown, so the deterministic stream stays byte-identical and a restored world
+      replays bit-identically. `stats()` reports a **spatial-sorting correlation**
+      per axis (each creature's local offset vs. its matching preference — positive
+      once clades have settled into the climate that suits them, ~0 when prefs are
+      scattered, null below two creatures or with no spread), surfaced as a HUD
+      **Climate sort** row, and the renderer washes the ground a faint amber where a
+      region runs warm and blue where it runs cool, so the mosaic the creatures sort
+      along is visible at a glance. `test/microclimate.test.mjs` covers the field
+      (determinism from the seed, seamless toroidal wrapping, offsets within their
+      amplitudes, the two axes being independent geographies, real warm/cool
+      spread), the *exact* local-climate metabolism wiring (energy falls by
+      precisely the local-taxed cost; the same body keeps more energy in a warm
+      region than a cool one), the sorting correlation (strongly positive when
+      sorted, strongly negative when anti-sorted, null when empty), and the v11 save
+      round-trip (seed preserved, field regrown sample-for-sample, a pre-v11 save
+      rejected, the restored world replaying bit-identically). The existing
+      climate-tolerance test neutralises the spatial amplitudes so it keeps
+      isolating the global formula.
+
 ## Next up
 
-- [ ] Now that climate selects on the animals directly, give it a *spatial* axis
-      too: a per-region microclimate (warmer/cooler, wetter/drier offsets baked
-      into the terrain map, or a smooth noise field over the world) layered on top
-      of the global season/weather, so `warmthPref`/`wetnessPref` also partition
-      creatures *across space* — a warm-adapted clade settling the sun-baked south
-      while a cold-adapted one holds the damp north — instead of only tracking the
-      global clock in time. Pairs with terrain (water already bogs movement) and
-      with the plant-kind spatial patchwork, turning the map into a true mosaic of
-      niches. Or pick a seed below.
+- [ ] Give the microclimate a feedback onto the *larder*, not only the animals:
+      let a region's warmth/wetness offset bias which **plant kind** sprouts there
+      and how richly (sunleaf favouring the warm-wet corners, moonleaf the cool-dry
+      ones), so the spatial climate mosaic and the plant-kind patchwork reinforce
+      each other into one coherent biome map instead of two independent overlays —
+      a warm-adapted, sunleaf-foraging clade then has a single region that suits
+      both its tolerance *and* its diet. Pairs with terrain fertility (already
+      spatial) and closes the loop between the new microclimate and the existing
+      `plantKindAt` / `kindYieldFactor`. Or pick a seed below.
 
 ## Ideas / someday
 

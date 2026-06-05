@@ -21,6 +21,10 @@ const TILE_COLORS = [
 // sub-resources creatures partition along read apart at a glance.
 const FOOD_COLORS = ["#3f7d52", "#7d6fb0"];
 
+// How many cells across to sample the microclimate wash. Coarse — the field is
+// broad regional patches, not fine detail — so the overlay stays cheap.
+const MICROCLIMATE_CELLS = 32;
+
 export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -72,6 +76,10 @@ export class Renderer {
     // Terrain. Paint the grass backdrop in one fill, then lay the water /
     // fertile / barren patches over it tile by tile.
     this.drawTerrain(ctx, world.terrain);
+    // Microclimate: a faint warm/cool wash over the ground so the spatial climate
+    // mosaic the creatures sort along is visible — warm regions glow amber, cool
+    // ones blue — under the terrain detail and everything else.
+    this.drawMicroclimate(ctx, world.microclimate);
     ctx.strokeStyle = "rgba(111, 211, 199, 0.15)";
     ctx.lineWidth = 1 / this.scale;
     ctx.strokeRect(0, 0, world.width, world.height);
@@ -155,6 +163,35 @@ export class Renderer {
         if (type === TILE.GRASS) continue;
         ctx.fillStyle = TILE_COLORS[type];
         ctx.fillRect(c * tileW - pad, r * tileH - pad, tileW + pad * 2, tileH + pad * 2);
+      }
+    }
+  }
+
+  // The microclimate as a faint coloured wash: a coarse grid of cells, each
+  // sampling the local warmth offset and tinting amber where a region runs warmer
+  // than the global average, blue where it runs cooler. The alpha tracks the
+  // offset's size (capped low so it never fights the entities on top), so the
+  // strongest warm/cool corners read clearly while neutral ground stays bare.
+  // Purely a view of the static field — it holds no state and never changes.
+  drawMicroclimate(ctx, microclimate) {
+    const cols = MICROCLIMATE_CELLS;
+    const rows = Math.max(1, Math.round(cols * (microclimate.height / microclimate.width)));
+    const cw = microclimate.width / cols;
+    const ch = microclimate.height / rows;
+    const amp = microclimate.warmthAmp || 1;
+    const pad = 0.5 / this.scale;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const x = (c + 0.5) * cw;
+        const y = (r + 0.5) * ch;
+        const warm = microclimate.warmthOffsetAt(x, y) / amp; // ~[-1, 1]
+        const a = Math.min(0.14, Math.abs(warm) * 0.14);
+        if (a < 0.005) continue;
+        ctx.fillStyle =
+          warm > 0
+            ? `rgba(214, 140, 64, ${a.toFixed(3)})` // amber: warmer than average
+            : `rgba(74, 128, 184, ${a.toFixed(3)})`; // blue: cooler than average
+        ctx.fillRect(c * cw - pad, r * ch - pad, cw + pad * 2, ch + pad * 2);
       }
     }
   }
