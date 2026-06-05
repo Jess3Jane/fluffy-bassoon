@@ -29,9 +29,55 @@
 // food on the next step, and the simulation replays bit-for-bit (`rebuild` and
 // sampling draw no rng). At amplitude 0 every offset is 0 and the world behaves
 // exactly as it did before the feedback existed.
+//
+// The feedback's *strength* is no longer a flat per-kind constant: each pellet
+// carries a heritable `canopyAmp` gene (in [0, 1], serialized with the larder) for
+// how strongly it shapes its understory, and its lean vote is scaled by
+// `canopyAmp / neutral` — a neutral plant votes the old ±1, an over-/under-invester
+// more/less. The gene passes from a sprout's nearest same-kind parent (single-
+// parent inheritance, in `World.parentCanopyAt`, so a mutant's deviation survives
+// to be selected on), and `canopyGermination` puts it under two opposing pressures
+// — a falling fecundity cost vs. a saturating facilitation benefit — so the
+// population evolves the gain toward an interior optimum and defends it against
+// drift, rather than the config fixing it. The helpers for that selection live
+// here; the field math above only *reads* the resulting per-plant investment.
 
 import { CONFIG } from "./config.js";
 import { sampleField } from "./terrain.js";
+import { clamp01 } from "./math.js";
+
+// The germination multiplier a sprout gets from its parent's canopy investment
+// `c` — the selection gradient on the heritable trait, and the source of truth for
+// both pressures that shape it. Two opposing terms, so an interior optimum emerges
+// from their balance rather than being dialled in:
+//   • a *fecundity cost*, linear and falling — building canopy diverts from seed,
+//     so heavier investers germinate less (`1 − fecundityCost·c`), favouring cheap
+//     light-touch seeding; floored at 0 so it can't go negative.
+//   • a *facilitation benefit*, saturating and rising — a parent's own canopy
+//     shelters its seedlings (`1 + facilitation·tanh(facilitationSlope·c)`), a
+//     private return with diminishing marginal value, favouring investment.
+// Their product is monotone-up where the ramping shelter outweighs the linear tax
+// and monotone-down once the tax wins, so germination peaks at an interior canopy
+// the population evolves toward and defends against drift — the feedback's gain is
+// now a selected trait, not a constant. A neutral/absent parent reads as no net
+// effect only to the extent the two terms cancel there; the curve is otherwise the
+// whole story (see `test/canopy.test.mjs` for its shape and argmax).
+export function canopyGermination(c) {
+  const cfg = CONFIG.vegetation.canopy;
+  const fecundity = Math.max(0, 1 - cfg.fecundityCost * c);
+  const shelter = 1 + cfg.facilitation * Math.tanh(cfg.facilitationSlope * c);
+  return fecundity * shelter;
+}
+
+// A new sprout's canopy gene: its nearest same-kind parent's investment (read off
+// the fine canopy lattice) with a small gaussian mutation, clamped to [0, 1]. The
+// lattice is fine enough that a cell holds ~one plant, so this copies a near-parent
+// and *preserves* a mutant's deviation across generations (real heritability)
+// rather than regressing it to a broad regional mean — which is what lets selection
+// act on the trait at all.
+export function inheritCanopy(parentAmp, rng) {
+  return clamp01(parentAmp + rng.normal() * CONFIG.vegetation.canopy.mutationStep);
+}
 
 export class VegetationField {
   constructor(width, height) {
@@ -46,6 +92,7 @@ export class VegetationField {
     this.leanScale = v.leanScale;
     this.warmthAmp = v.warmthAmplitude;
     this.wetnessAmp = v.wetnessAmplitude;
+    this.canopyNeutral = v.canopy.neutral;
 
     // The per-cell signed lean of the standing larder (sunleaf +1, moonleaf −1),
     // shaped as a wrapping value-noise lattice so `sampleField` can interpolate it
@@ -69,11 +116,17 @@ export class VegetationField {
     const { cols, rows } = this;
     for (const f of food) {
       if (f.dead) continue; // defensive: the step-boundary larder carries no corpses
+      const kind = f.kind === 1 ? 1 : 0;
+      const amp = f.canopyAmp ?? this.canopyNeutral;
       let c = Math.floor((f.x / this.width) * cols);
       let r = Math.floor((f.y / this.height) * rows);
       c = ((c % cols) + cols) % cols;
       r = ((r % rows) + rows) % rows;
-      data[r * cols + c] += f.kind === 1 ? -1 : 1;
+      // The lean vote is scaled by the plant's *heritable* canopy investment
+      // (relative to the neutral reference, so a neutral plant votes the old ±1),
+      // so a stand of heavy investers shapes its understory more strongly than a
+      // light one — the feedback's strength is now the evolved trait, not a flat ±1.
+      data[r * cols + c] += (kind === 1 ? -amp : amp) / this.canopyNeutral;
     }
     let sum = 0;
     for (let i = 0; i < data.length; i++) sum += data[i];

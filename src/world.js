@@ -25,7 +25,7 @@ import {
 } from "./weather.js";
 import { Terrain } from "./terrain.js";
 import { Microclimate } from "./microclimate.js";
-import { VegetationField } from "./vegetation.js";
+import { VegetationField, canopyGermination, inheritCanopy } from "./vegetation.js";
 import { ScentField } from "./scent.js";
 import {
   plantKindAt,
@@ -61,8 +61,12 @@ const MAX_CREATURE_RADIUS = CONFIG.creature.radius * GENES.size[1];
 // bit-for-bit, so only the number is stored. The mating-isolation ring added
 // later is *not* a version bump: it's pure readout state an older save can
 // satisfy by simply loading empty, so it degrades gracefully rather than
-// rejecting the save (see `deserialize`).
-const SAVE_VERSION = 11;
+// rejecting the save (see `deserialize`). v12 added a per-pellet, heritable
+// `canopyAmp` — how strongly that plant shapes its understory microclimate (the
+// vegetation feedback's strength, now an evolving trait): a pre-v12 pellet lacks
+// it, so its lean vote and the fecundity tax read from it would be undefined —
+// better to reject the save than rebuild the field off a NaN.
+const SAVE_VERSION = 12;
 
 export class World {
   // `seed: false` builds an empty world (no starting food/creatures, rng
@@ -77,6 +81,12 @@ export class World {
     // Spatial indices, rebuilt each step before the creature loop runs.
     this.foodGrid = new SpatialGrid(this.width, this.height, CONFIG.spatial.cellSize);
     this.creatureGrid = new SpatialGrid(this.width, this.height, CONFIG.spatial.cellSize);
+    // A separate food index rebuilt at the *step boundary* (before this step's
+    // spawning), used only so a new sprout can find its nearest same-kind parent
+    // to inherit canopy from. Kept apart from `foodGrid` (which is rebuilt after
+    // spawning, for the creature loop) so the parent lookup reads the exact larder
+    // a save captures — keeping canopy inheritance deterministic across save/load.
+    this.canopyGrid = new SpatialGrid(this.width, this.height, CONFIG.spatial.cellSize);
 
     this.foodSpawnAccumulator = 0;
     this.time = 0;
@@ -192,10 +202,19 @@ export class World {
         const dw = this.warmthOffsetAt(px, py);
         const dm = this.wetnessOffsetAt(px, py);
         const kind = plantKindAt(px, py, kindClimateBias(dw, dm));
+        // The nearest same-kind parent's canopy investment shapes this sprout's
+        // germination: a fecundity cost (canopy diverts from seed) against a
+        // facilitation benefit (the parent's canopy shelters its seedlings), so an
+        // interior investment is favoured (`canopyGermination`). Read off the
+        // vegetation field rebuilt at the step boundary, so it's deterministic and
+        // rebuilds identically from a restored save.
+        const localCanopy = this.parentCanopyAt(px, py, kind);
         const fertility =
-          this.terrain.fertilityAt(px, py) * kindFertilityFactor(kind, dw, dm);
+          this.terrain.fertilityAt(px, py) *
+          kindFertilityFactor(kind, dw, dm) *
+          canopyGermination(localCanopy);
         if (this.rng.chance(fertility)) {
-          const f = { x: px, y: py, kind };
+          const f = { x: px, y: py, kind, canopyAmp: inheritCanopy(localCanopy, this.rng) };
           this.food.push(f);
           return f;
         }
@@ -209,7 +228,8 @@ export class World {
     // feedback included).
     const dw = this.warmthOffsetAt(x, y);
     const dm = this.wetnessOffsetAt(x, y);
-    const f = { x, y, kind: plantKindAt(x, y, kindClimateBias(dw, dm)) };
+    const kind = plantKindAt(x, y, kindClimateBias(dw, dm));
+    const f = { x, y, kind, canopyAmp: inheritCanopy(this.parentCanopyAt(x, y, kind), this.rng) };
     this.food.push(f);
     return f;
   }
@@ -224,6 +244,28 @@ export class World {
       this.peakPopulation = this.creatures.length;
     }
     return c;
+  }
+
+  // The canopy investment a sprout at (x, y) inherits: the `canopyAmp` of the
+  // nearest same-kind plant within `inheritRadius` (its parent), or the neutral
+  // gene if none is in reach (a pioneer founding a fresh stand). Read off the
+  // step-boundary `canopyGrid`, so it's deterministic and replays identically from
+  // a restored save. Single-parent inheritance is the point: it preserves a
+  // mutant's deviation across generations so selection (`canopyGermination`) can
+  // actually act on the trait, where a regional mean would just wash it out.
+  parentCanopyAt(x, y, kind) {
+    const radius = CONFIG.vegetation.canopy.inheritRadius;
+    let best = null;
+    let bestD = radius * radius;
+    this.canopyGrid.forEachNear(x, y, radius, (f) => {
+      if (f.dead || (f.kind === 1 ? 1 : 0) !== kind) return;
+      const d = wrapDistSq(x, y, f.x, f.y, this.width, this.height);
+      if (d < bestD) {
+        bestD = d;
+        best = f;
+      }
+    });
+    return best ? best.canopyAmp ?? CONFIG.vegetation.canopy.neutral : CONFIG.vegetation.canopy.neutral;
   }
 
   // Nearest food to a point within `radius`, or null. Uses the food grid. When a
@@ -437,6 +479,9 @@ export class World {
     // a loaded world rebuilds the identical field from its restored food, so the
     // simulation replays bit-for-bit.
     this.vegetation.rebuild(this.food);
+    // Index the step-boundary larder so each sprout below can inherit canopy from
+    // its nearest same-kind parent (see `parentCanopyAt`).
+    this.canopyGrid.rebuild(this.food);
 
     // Grow food over time, scaled by two rhythms: the day-night cycle (fast by
     // day, slow at night) and the slower season × weather climate (rich summers
@@ -622,6 +667,7 @@ export class World {
     // consumption rather than a static map. ~0 with the feedback off or no
     // spread; null with no food. Pure observation — no rng, no feedback.
     let biomeScore = 0;
+    let canopySum = 0;
     const biomeNorm = this.microclimate.warmthAmp + this.microclimate.wetnessAmp;
     for (const f of this.food) {
       foodByKind[f.kind === 1 ? 1 : 0]++;
@@ -630,11 +676,16 @@ export class World {
         this.microclimate.warmthOffsetAt(f.x, f.y),
         this.microclimate.wetnessOffsetAt(f.x, f.y),
       );
+      canopySum += f.canopyAmp ?? CONFIG.vegetation.canopy.neutral;
     }
     const biomeSort =
       this.food.length > 0 && biomeNorm > 0
         ? biomeScore / this.food.length / biomeNorm
         : null;
+    // The standing larder's mean canopy investment (the evolving strength of the
+    // vegetation feedback): drifts up where entrenching the biome pays its
+    // fecundity cost, down where cheap seeding wins. Null with no food.
+    const canopy = this.food.length > 0 ? canopySum / this.food.length : null;
     // What each plant kind is worth *right now* — its richness × day-night
     // rhythm — so the HUD can show which specialism the clock currently favours
     // (a sunleaf peaking by day, a moonleaf by night) beside the standing split.
@@ -680,6 +731,7 @@ export class World {
       climateSortWarmth,
       climateSortWetness,
       biomeSort,
+      canopy,
       avg,
     };
   }
@@ -713,7 +765,8 @@ export class World {
 
   // A plain, JSON-safe snapshot of the whole world: the running counters, the
   // rng state (so the resumed stream is identical), and every live entity.
-  // Food is stored as compact [x, y] pairs; the spatial grids are derived and
+  // Food is stored as compact [x, y, kind, canopyAmp] tuples; the spatial grids
+  // (and the vegetation field) are derived and
   // rebuilt on the next update, so they aren't saved. Dead-but-not-yet-compacted
   // entities are filtered out defensively.
   serialize() {
@@ -730,7 +783,7 @@ export class World {
       terrainSeed: this.terrainSeed,
       microclimateSeed: this.microclimateSeed,
       rngState: this.rng.getState(),
-      food: this.food.filter((f) => !f.dead).map((f) => [f.x, f.y, f.kind]),
+      food: this.food.filter((f) => !f.dead).map((f) => [f.x, f.y, f.kind, f.canopyAmp]),
       creatures: this.creatures.filter((c) => c.alive).map((c) => c.serialize()),
       scent: this.scent.serialize(),
       matingRing: this.matingRing.slice(),
@@ -762,7 +815,12 @@ export class World {
     world.microclimateSeed = data.microclimateSeed >>> 0;
     world.microclimate = new Microclimate(world.width, world.height, world.microclimateSeed);
 
-    world.food = data.food.map(([x, y, kind]) => ({ x, y, kind: kind === 1 ? 1 : 0 }));
+    world.food = data.food.map(([x, y, kind, canopyAmp]) => ({
+      x,
+      y,
+      kind: kind === 1 ? 1 : 0,
+      canopyAmp: canopyAmp ?? CONFIG.vegetation.canopy.neutral,
+    }));
     world.scent = ScentField.deserialize(data.scent, world.width, world.height);
     // The isolation window is pure readout state, so an older save that predates
     // it loads with an empty ring (the read just refills as breeding resumes)

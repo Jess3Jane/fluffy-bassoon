@@ -217,7 +217,7 @@ const dt = 1 / 60;
   const world = new World(makeRng(77));
   for (let i = 0; i < 120; i++) world.update(dt);
   const blob = JSON.parse(JSON.stringify(world.serialize()));
-  assert.equal(blob.version, 11, "snapshot carries SAVE_VERSION 11");
+  assert.equal(blob.version, 12, "snapshot carries the current SAVE_VERSION");
   assert.equal(typeof blob.microclimateSeed, "number", "the microclimate seed is serialized");
 
   const restored = World.deserialize(blob, makeRng());
