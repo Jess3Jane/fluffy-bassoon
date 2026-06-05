@@ -1134,19 +1134,49 @@ population dynamics, natural selection, and surprising behaviour.
       DOM shim, since — like the renderer and main entry point — the live `<details>`
       DOM needs a browser. CSS hides the default disclosure marker for a triangle
       that rotates on open and matches the inspector's uppercase-accent section heads.
+- [x] **UI/UX: follow-selected camera mode** (follow-up (e) to the inspector/camera),
+      so the inspected creature can be *kept centred as it moves* rather than wandering
+      out of a zoomed-in view a frame later. A **⌖ Follow** toggle sits in the inspector
+      head (between the title and the close ×); switching it on pins the camera to the
+      selected creature, re-centring on it every frame in the main loop. Because the
+      whole world fits at zoom 1 (where centring on one creature is a no-op), enabling
+      Follow from the fully zoomed-out view first pushes in to a comfortable
+      `followZoom` (5×) so the tracked creature is big enough to watch; if the viewer
+      has already zoomed, their zoom is left alone. The new primitive is a pure
+      `Camera.centerOn(wx, wy, …)` that sets the world-space centre and re-uses the
+      existing `view()` clamping — so following a creature toward a world edge slides
+      the centre only as far as the edge allows, and following at zoom 1 stays pinned to
+      the world centre, exactly the established panning rules (zoom is untouched). A
+      followed creature crossing the toroidal seam jumps the centre once, the only
+      discontinuity and a rare one at the creatures' slow pace. Control hand-off is
+      deliberate: a manual **pan** (drag / pinch / arrow keys) releases Follow via a new
+      `onUserPan` hook on the `CameraController`, so panning always wins rather than
+      fighting the re-centring — but **zooming** while following keeps tracking, just
+      closer or further out. Follow is reset on every selection change (a fresh pick
+      never silently carries the previous creature's follow) and released the instant
+      the followed creature dies (the per-frame selection-resolve returns null →
+      `setFollow(false)`, which also hides the inspector). Purely a *view* feature: no
+      rng, no serialized state, no simulation touch (no `SAVE_VERSION` bump), so the
+      headless suite stays green; `test/camera.test.mjs` gains coverage for `centerOn`
+      (interior point lands at the viewport centre, off-world points clamp to the edge,
+      zoom-1 stays pinned, zoom is preserved). The DOM wiring (the toggle, the per-frame
+      centring, the pan hand-off) needs a browser, so it was checked there: enabling
+      Follow visibly zoomed to and centred the inspected creature, and its death
+      released the camera and closed the inspector.
 
 ## Next up
 
-- [ ] **UI/UX, continued.** Three passes have landed — a *creature inspector*, a
-      *pan/zoom camera*, and now *collapsible stat groups* (all below); remaining
-      follow-ups: (c)
+- [ ] **UI/UX, continued.** Four passes have landed — a *creature inspector*, a
+      *pan/zoom camera*, *collapsible stat groups*, and now a *follow-selected camera
+      mode* (all below); remaining follow-ups: (c)
       **click-through inspector links** — jump from a creature to its nearest kin
-      or its current target (now that the camera can zoom to it); (d) a **legend**
+      or its current target (the camera can zoom to it and now *follow* it too, so a
+      link could select-and-follow in one click); (d) a **legend**
       for the canvas colours/washes (trophic vs. lineage, the amber/blue climate
       wash, the green/violet plant kinds), which are currently undocumented in-app;
-      (e) **two-finger pinch follow-ups** — the camera handles pinch/pan, but a
-      *follow-selected* mode (keep the inspected creature centred as it moves) and
-      smooth zoom inertia would round it out.
+      (e) **smooth zoom inertia** — the remaining pinch/zoom polish now that
+      *follow-selected* (keep the inspected creature centred as it moves) has landed;
+      eased wheel/button zoom would round out the camera feel.
 - [ ] **Widen the realised canopy sort — kin-structured canopy as a public good.**
       The spatial sort is now *realised* (above): viability withering pulls barren
       stands onto heavy canopy and fertile stands onto light, a robust +0.045 across

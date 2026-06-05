@@ -15,6 +15,10 @@ export const CAMERA = {
   wheelStep: 1.0015,
   keyZoomStep: 1.2, // zoom factor per +/- keypress
   keyPanFrac: 0.18, // arrow-key pan, as a fraction of the visible span
+  // When "follow selected" is switched on from the fully zoomed-out view, push in
+  // to this zoom so the tracked creature is actually large enough to watch (at
+  // zoom 1 the whole world fits and centring on one creature is a no-op).
+  followZoom: 5,
 };
 
 function clamp(v, lo, hi) {
@@ -88,6 +92,19 @@ export class Camera {
     return this.view(worldW, worldH, viewW, viewH); // re-clamp the centre
   }
 
+  // Centre the view on a world point (the inspected creature, for "follow"),
+  // leaving the zoom untouched. `view` re-clamps, so following a creature toward
+  // a world edge slides the centre only as far as the edge allows and following
+  // at zoom 1 stays pinned to the world centre — exactly the panning rules. The
+  // creature's position is its canonical (un-wrapped) coordinate, so a creature
+  // crossing the toroidal seam jumps the centre once; tracked per frame at the
+  // creature's slow pace, that's the only discontinuity and it's rare.
+  centerOn(wx, wy, worldW, worldH, viewW, viewH) {
+    this.cx = wx;
+    this.cy = wy;
+    return this.view(worldW, worldH, viewW, viewH);
+  }
+
   // Pan the camera by a world-space delta (the primitive the others build on).
   panByWorld(dwx, dwy, worldW, worldH, viewW, viewH) {
     if (this.cx == null) this.cx = worldW / 2;
@@ -123,11 +140,17 @@ export class Camera {
 // controller independently abandons its stroke the moment a second pointer
 // appears, so the two never fight over a gesture.
 export class CameraController {
-  constructor({ canvas, camera, renderer, getWorld }) {
+  constructor({ canvas, camera, renderer, getWorld, onUserPan }) {
     this.canvas = canvas;
     this.camera = camera;
     this.renderer = renderer; // for the live viewport size
     this.getWorld = getWorld; // world is swapped on reset / load, so read it live
+    // Called when the viewer actively pans (drag / pinch / arrows). "Follow
+    // selected" uses it to step aside the instant the viewer grabs the view, so
+    // manual panning always wins rather than fighting the per-frame re-centring.
+    // Zoom is deliberately *not* a user-pan: zooming while following keeps
+    // tracking the creature, just closer or further out.
+    this.onUserPan = onUserPan ?? null;
     // Active pointers by id → {x, y}, so a two-finger pinch/pan can be tracked.
     this.pointers = new Map();
     // Previous two-finger gesture frame {cx, cy, dist}, or null between gestures.
@@ -189,6 +212,7 @@ export class CameraController {
         // ratio (which re-pins the centroid, so the two compose cleanly).
         this.camera.panByScreen(cx - this.gesture.cx, cy - this.gesture.cy, ...dims);
         this.camera.zoomAt(dist / this.gesture.dist, cx, cy, ...dims);
+        this.onUserPan?.();
       }
       this.gesture = { cx, cy, dist };
       return;
@@ -199,6 +223,7 @@ export class CameraController {
       this.camera.panByScreen(e.clientX - this.panX, e.clientY - this.panY, ...this.dims());
       this.panX = e.clientX;
       this.panY = e.clientY;
+      this.onUserPan?.();
     }
   }
 
@@ -223,15 +248,19 @@ export class CameraController {
     switch (e.key) {
       case "ArrowLeft":
         this.camera.panByWorld(-stepX, 0, ...dims);
+        this.onUserPan?.();
         break;
       case "ArrowRight":
         this.camera.panByWorld(stepX, 0, ...dims);
+        this.onUserPan?.();
         break;
       case "ArrowUp":
         this.camera.panByWorld(0, -stepY, ...dims);
+        this.onUserPan?.();
         break;
       case "ArrowDown":
         this.camera.panByWorld(0, stepY, ...dims);
+        this.onUserPan?.();
         break;
       case "+":
       case "=":
@@ -252,5 +281,20 @@ export class CameraController {
   zoomCentre(factor) {
     const [worldW, worldH, viewW, viewH] = this.dims();
     this.camera.zoomAt(factor, viewW / 2, viewH / 2, worldW, worldH, viewW, viewH);
+  }
+
+  // Centre the live world dimensions on (wx, wy) — the per-frame call that keeps
+  // a followed creature in the middle of the view.
+  centerOn(wx, wy) {
+    this.camera.centerOn(wx, wy, ...this.dims());
+  }
+
+  // Switching follow on from the fully zoomed-out view would centre on the
+  // creature but show it as a speck, so push in to the follow zoom first; if the
+  // viewer has already zoomed in, leave their zoom alone.
+  ensureFollowZoom() {
+    if (this.camera.zoom <= CAMERA.minZoom + 1e-6) {
+      this.zoomCentre(CAMERA.followZoom / this.camera.zoom);
+    }
   }
 }

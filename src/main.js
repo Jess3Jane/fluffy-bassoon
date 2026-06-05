@@ -37,6 +37,11 @@ let lastTime = performance.now();
 // moment the creature dies or the world is swapped out.
 let selectedId = null;
 
+// Whether the camera tracks the selected creature, keeping it centred as it
+// moves (the inspector's "Follow" toggle). Only meaningful while something is
+// selected; reset on every selection change and released if the creature dies.
+let follow = false;
+
 // Adopt a freshly built or restored world: swap it in, start a clean chart
 // history, and reset the loop's timing so we don't fast-forward the new world.
 function adopt(newWorld) {
@@ -88,6 +93,13 @@ function loop(now) {
   const selected = resolveSelection();
   if (selected == null) selectedId = null;
   renderer.selected = selected;
+
+  // Follow mode: re-centre on the tracked creature each frame. If it has died
+  // (selection resolved to null), release the camera and drop the toggle.
+  if (follow) {
+    if (selected) cameraControls.centerOn(selected.x, selected.y);
+    else setFollow(false);
+  }
 
   renderer.draw(world);
   updateHud();
@@ -288,15 +300,30 @@ const inspectorEl = document.getElementById("inspector");
 const inspectorTitle = document.getElementById("inspector-title");
 const inspectorSwatch = document.getElementById("inspector-swatch");
 const inspectorBody = document.getElementById("inspector-body");
+const followBtn = document.getElementById("inspector-follow");
 
 // Set (or clear) the inspector selection. Passing a creature focuses on it;
 // passing null deselects. Updates the renderer highlight immediately so a click
-// feels responsive even between HUD refreshes.
+// feels responsive even between HUD refreshes. A fresh selection always starts
+// un-followed, so following never silently carries from one creature to another.
 function select(creature) {
   selectedId = creature ? creature.id : null;
   renderer.selected = creature ?? null;
+  setFollow(false);
   updateInspector(creature ?? null);
 }
+
+// Toggle "follow selected": tracking only engages while a creature is selected,
+// and switching it on from the zoomed-out view pushes in so the creature is big
+// enough to watch. Reflected on the button (pressed state + an `on` class).
+function setFollow(on) {
+  follow = on && selectedId != null;
+  followBtn.classList.toggle("on", follow);
+  followBtn.setAttribute("aria-pressed", follow ? "true" : "false");
+  if (follow) cameraControls.ensureFollowZoom();
+}
+
+followBtn.addEventListener("click", () => setFollow(!follow));
 
 // Find the live, still-alive creature matching the current selection id, or null
 // if it has died or the world was swapped. O(n) but only while something is
@@ -511,6 +538,11 @@ const cameraControls = new CameraController({
   camera,
   renderer,
   getWorld: () => world,
+  // A deliberate pan (drag / pinch / arrow keys) hands camera control back to
+  // the viewer, so it releases follow rather than fighting the re-centring.
+  onUserPan: () => {
+    if (follow) setFollow(false);
+  },
 });
 
 // How hard each on-screen +/- button click zooms — a bigger step than a wheel

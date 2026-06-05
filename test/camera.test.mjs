@@ -154,6 +154,42 @@ function approx(a, b, eps = 1e-9, msg = "") {
   approx(nowSy, sy + dy, 1e-7, "grabbed point followed the drag in y");
 }
 
+// --- centerOn places the followed point at the viewport centre (zoomed in). ---
+{
+  const cam = new Camera();
+  cam.zoom = 4;
+  const t = cam.centerOn(500, 350, W, H, VW, VH);
+  // The chosen point is comfortably interior, so it isn't edge-clamped and ends
+  // up exactly at the centre pixel.
+  approx(cam.cx, 500, 1e-9, "centre x set to the followed point");
+  approx(cam.cy, 350, 1e-9, "centre y set to the followed point");
+  const sx = t.offsetX + 500 * t.scale;
+  const sy = t.offsetY + 350 * t.scale;
+  approx(sx, VW / 2, 1e-7, "followed point sits at the viewport centre x");
+  approx(sy, VH / 2, 1e-7, "followed point sits at the viewport centre y");
+  approx(cam.zoom, 4, 1e-12, "centerOn leaves the zoom untouched");
+}
+
+// --- centerOn re-clamps so following past an edge stops at the edge. ---
+{
+  const cam = new Camera();
+  cam.zoom = 4;
+  cam.centerOn(W + 1000, H + 1000, W, H, VW, VH); // a creature off the far corner
+  const fit = Math.min(VW / W, VH / H);
+  const scale = fit * 4;
+  approx(cam.cx, W - VW / 2 / scale, 1e-9, "follow clamped at the right edge");
+  approx(cam.cy, H - VH / 2 / scale, 1e-9, "follow clamped at the bottom edge");
+}
+
+// --- centerOn at zoom 1 stays pinned to the world centre (nothing to follow). ---
+{
+  const cam = new Camera();
+  cam.zoom = 1;
+  cam.centerOn(100, 100, W, H, VW, VH);
+  approx(cam.cx, W / 2, 1e-9, "zoom-1 follow pinned to world centre x");
+  approx(cam.cy, H / 2, 1e-9, "zoom-1 follow pinned to world centre y");
+}
+
 // --- reset returns to the default fit. ---
 {
   const cam = new Camera();
