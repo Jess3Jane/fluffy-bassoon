@@ -90,6 +90,21 @@ export const CONFIG = {
     baseMetabolism: 4, // energy/second at rest
     moveMetabolism: 0.018, // energy per unit of distance travelled
 
+    // Climate tolerance: each creature carries a preferred warmth and wetness
+    // (the `warmthPref` / `wetnessPref` genes), and its *base* metabolism rises
+    // with how far the current climate has drifted from that point —
+    // `1 + climateStressCost · climateStress`, where the stress is the squared
+    // drift on the two [0, 1] climate axes (warmth = season, wetness = weather),
+    // up to 2 for a creature perfectly anti-adapted to the present climate. This
+    // makes the season/weather swings select on the animals directly (winters
+    // cull the summer-adapted, droughts the rain-adapted), not only through the
+    // food they grow — and pairs with the plant kinds' own climate leans, so a
+    // clade is pulled to match its tolerance to where its forage pays. Kept
+    // modest so a typical seasonal mismatch is a real but survivable tax (a
+    // half-axis mismatch ≈ +12% base cost) rather than an outright cull each
+    // winter — selection nudges the prefs to track the climate.
+    climateStressCost: 0.5,
+
     // Reproduction: once a creature is over this energy it can split, paying
     // the cost and passing half its remaining energy to the child.
     reproduceThreshold: 200,

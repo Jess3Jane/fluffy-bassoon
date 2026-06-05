@@ -5,9 +5,9 @@
 // not from cleverness in any single individual.
 
 import { CONFIG } from "./config.js";
-import { randomGenome, mutate, crossover, genomeHue, hueSimilarity, huntYield } from "./genome.js";
+import { randomGenome, mutate, crossover, genomeHue, hueSimilarity, huntYield, climateStress } from "./genome.js";
 import { wrapDelta, wrapDistSq } from "./math.js";
-import { weatherSenseFactor, windStrength, windDirection } from "./weather.js";
+import { weatherSenseFactor, windStrength, windDirection, climateWarmth, climateWetness } from "./weather.js";
 import { SCENT } from "./scent.js";
 
 let NEXT_ID = 1;
@@ -298,7 +298,19 @@ export class Creature {
     // --- Metabolise. ---
     this.age += dt;
     const sizeCost = g.size * g.size; // bigger bodies cost more to run
-    let cost = c.baseMetabolism * g.metabolismEff * sizeCost;
+    // Climate mismatch tax: a creature stranded far from its preferred warmth /
+    // wetness burns its base metabolism faster, so the season and weather select
+    // on the animals directly — not only through the larder they grow. Pure in
+    // sim-time (the climate axes) and the genome, drawing no rng, so it leaves
+    // the deterministic stream untouched and replays bit-identically.
+    const stress = climateStress(
+      g.warmthPref,
+      g.wetnessPref,
+      climateWarmth(world.time),
+      climateWetness(world.time),
+    );
+    const climateFactor = 1 + c.climateStressCost * stress;
+    let cost = c.baseMetabolism * g.metabolismEff * sizeCost * climateFactor;
     cost += dist * c.moveMetabolism * sizeCost;
     if (this.age > c.maxAgeSeconds) cost *= 1.5; // senescence
     this.energy -= cost * dt;

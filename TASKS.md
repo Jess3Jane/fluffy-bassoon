@@ -644,16 +644,62 @@ population dynamics, natural selection, and surprising behaviour.
       winter / driest spell, isolated from the daily axis), the centred annual
       mean, and the three-way `energy × daily × climate` decomposition.
 
+- [x] Heritable *climate tolerance*, so the season and weather swings select on
+      the animals directly and not only through the larder they grow. Two new
+      genes (`src/genome.js`, both in `[0,1]` so they mutate and clamp like any
+      other) set a creature's preferred point on the two slow climate axes the
+      world already swings along: `warmthPref` (the season) and `wetnessPref` (the
+      weather). They change nothing about how a creature senses or moves — they
+      set the climate it is *built for*. Living away from that point costs energy:
+      `climateStress(warmthPref, wetnessPref, warmth, wetness)` is the squared
+      drift of the current climate from the preferred point (in `[0,2]`, the
+      mirror of `forageYield`/`huntYield` as a pure source-of-truth function), and
+      `Creature.update` turns it into a *base-metabolism* multiplier
+      `1 + climateStressCost · stress` — so a creature sitting in its preferred
+      climate pays the base rate while one stranded far from it (a summer-adapted
+      body in deep winter, a rain-adapted one in a drought) burns energy faster.
+      The two climate axes are canonical pure-in-time readouts (`climateWarmth` =
+      `seasonLevel`, `climateWetness` = the weather noise folded onto `[0,1]`, both
+      in `src/weather.js`), so the whole tax is a pure function of sim-time and the
+      genome — it draws **no rng**, leaving the deterministic stream byte-identical
+      (every prior replay/save test passes untouched) and replaying bit-identically
+      across save/load. Squaring the drift keeps everyday seasonal wobble a gentle
+      tax and makes the extremes the real cull (winters cull the summer-adapted,
+      droughts the rain-adapted — the climate is now a selective axis in its own
+      right). Crucially this **pairs with the plant kinds' own opposite climate
+      leans**: sunleaf thrives in summer rain, moonleaf in winter drought, so a
+      clade is pulled to match its tolerance to the climate where its forage
+      actually pays — coupling `warmthPref`/`wetnessPref` to `forage` rather than
+      letting them drift freely. Being ordinary adaptive genes they join
+      `geneVector`, so a climate-niche split registers in the ecological species
+      count. `SAVE_VERSION` → 10 (a pre-v10 genome lacks the prefs, so its
+      climate-stress metabolism would be NaN — the save is rejected rather than
+      loaded). `stats()` averages both prefs, the HUD shows **Warmth pref** /
+      **Wetness pref** rows beside the niche traits, and the avg-traits chart plots
+      them as two more lines (`warm`/`wet`), so the population's drift toward the
+      prevailing climate (and any split tracking the two plant kinds) is legible.
+      A 10-minute headless run holds the same boom/bust population band (15–135,
+      self-sustaining) with active predation and 4–6 coexisting ecotypes, no NaNs.
+      `test/climate-tolerance.test.mjs` covers the stress curve (zero when matched,
+      the squared/symmetric/monotone shape, the `[0,2]` cap), the climate axes, the
+      gene plumbing, the *exact* metabolism wiring (energy falls by precisely the
+      climate-taxed cost; a matched body keeps strictly more than an anti-adapted
+      one, by exactly `base·eff·size²·climateStressCost·stress·dt`), the cull
+      direction across the year, the `stats()` averages, and the save round-trip
+      (genes preserved, a pre-v10 save rejected, the restored world replaying
+      bit-identically).
+
 ## Next up
 
-- [ ] Give creatures a heritable *thermal/moisture tolerance* so the new climate
-      swings select on the animals directly, not only through their food: a gene
-      (or pair) setting a preferred warmth/wetness, with metabolism rising as the
-      current climate drifts from the preferred point — so winters cull the
-      summer-adapted and droughts the rain-adapted, and the climate becomes a
-      selective axis in its own right rather than purely a larder modulator. Pairs
-      naturally with the plant-kind climate leans (a summer-rain clade grazing
-      sunleaf vs. a winter-drought clade grazing moonleaf). Or pick a seed below.
+- [ ] Now that climate selects on the animals directly, give it a *spatial* axis
+      too: a per-region microclimate (warmer/cooler, wetter/drier offsets baked
+      into the terrain map, or a smooth noise field over the world) layered on top
+      of the global season/weather, so `warmthPref`/`wetnessPref` also partition
+      creatures *across space* — a warm-adapted clade settling the sun-baked south
+      while a cold-adapted one holds the damp north — instead of only tracking the
+      global clock in time. Pairs with terrain (water already bogs movement) and
+      with the plant-kind spatial patchwork, turning the map into a true mosaic of
+      niches. Or pick a seed below.
 
 ## Ideas / someday
 

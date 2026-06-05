@@ -45,11 +45,12 @@ const MAX_CREATURE_RADIUS = CONFIG.creature.radius * GENES.size[1];
 // genome lacks forage, so its foraging would be undefined, and a pre-v8 pellet
 // carries no kind, so its yield would be undefined). v9 added the `hunt` gene
 // for prey-size specialism (a pre-v9 genome lacks it, so its predation yield
-// would be NaN-scaled). The mating-isolation ring added later is *not* a version
-// bump: it's pure readout state an older save can satisfy by simply loading
-// empty, so it degrades gracefully rather than rejecting the save (see
-// `deserialize`).
-const SAVE_VERSION = 9;
+// would be NaN-scaled). v10 added the `warmthPref` / `wetnessPref` climate-
+// tolerance genes (a pre-v10 genome lacks them, so its climate-stress metabolism
+// would be NaN). The mating-isolation ring added later is *not* a version bump:
+// it's pure readout state an older save can satisfy by simply loading empty, so
+// it degrades gracefully rather than rejecting the save (see `deserialize`).
+const SAVE_VERSION = 10;
 
 export class World {
   // `seed: false` builds an empty world (no starting food/creatures, rng
@@ -479,6 +480,8 @@ export class World {
       kinship: 0,
       mating: 0,
       mateChoice: 0,
+      warmthPref: 0,
+      wetnessPref: 0,
     };
     let maxGen = 0;
     let energy = 0;
@@ -500,6 +503,8 @@ export class World {
       avg.kinship += c.genome.kinship;
       avg.mating += c.genome.mating;
       avg.mateChoice += c.genome.mateChoice;
+      avg.warmthPref += c.genome.warmthPref;
+      avg.wetnessPref += c.genome.wetnessPref;
       energy += c.energy;
       if (c.genome.diet > CONFIG.creature.carnivoreThreshold) carnivores++;
       if (c.generation > maxGen) maxGen = c.generation;
