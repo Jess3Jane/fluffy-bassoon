@@ -155,6 +155,96 @@ button:disabled:hover { background: rgba(111, 211, 199, 0.12); }
   line-height: 1.5;
 }
 
+/* --- Legend (bottom-centre): a key for the canvas colours and washes ---
+   A folding panel so it stays a single chip until opened, keeping the view
+   clear. Anchored bottom-centre — clear of the HUD (which owns the whole left
+   column) and the inspector / camera controls on the right — and grown upward
+   from its fixed bottom edge so it never spills off small viewports. */
+
+#legend {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  width: 220px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 8px 12px 10px;
+  background: var(--panel);
+  border: 1px solid rgba(111, 211, 199, 0.18);
+  border-radius: 10px;
+  backdrop-filter: blur(6px);
+  user-select: none;
+  z-index: 5;
+}
+
+/* Collapsed, the panel is just its summary chip; drop the padding so it reads as
+   a compact tag rather than an empty box. */
+#legend:not([open]) { padding: 6px 12px; }
+
+#legend > summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--accent);
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+#legend > summary::-webkit-details-marker { display: none; }
+
+#legend > summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 1em;
+  color: var(--muted);
+  transition: transform 0.12s ease;
+}
+
+#legend[open] > summary::before { transform: rotate(90deg); }
+
+#legend-body { margin-top: 8px; }
+
+.legend-sect {
+  font-size: 9.5px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0.7;
+  margin: 8px 0 4px;
+}
+
+.legend-sect:first-child { margin-top: 0; }
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 3px 0;
+}
+
+.legend-swatch {
+  flex: none;
+  width: 22px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.legend-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 0;
+}
+
+.legend-label { font-size: 11px; color: var(--text); }
+
+.legend-note {
+  font-size: 9.5px;
+  color: var(--muted);
+}
+
 /* --- Camera controls (bottom-right): zoom in / out / reset view --- */
 
 #camera-controls {

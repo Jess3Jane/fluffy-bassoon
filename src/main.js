@@ -12,6 +12,7 @@ import { History } from "./history.js";
 import { Charts } from "./charts.js";
 import { saveWorld, loadWorld, hasSavedWorld } from "./persistence.js";
 import { ToolController, TOOLS, TOOL_LABELS } from "./tools.js";
+import { renderLegend } from "./legend.js";
 import { phaseLabel } from "./daycycle.js";
 import { kindLabel } from "./plants.js";
 import { seasonLabel, weatherLabel, windStrength, windLabel } from "./weather.js";
@@ -496,7 +497,18 @@ colourBtn.addEventListener("click", () => {
   const i = COLOUR_MODES.indexOf(renderer.colorMode);
   renderer.colorMode = COLOUR_MODES[(i + 1) % COLOUR_MODES.length];
   colourBtn.textContent = "Colour: " + COLOUR_LABELS[renderer.colorMode];
+  // The legend's creatures key reads differently per mode (diet vs. clade), so
+  // rebuild it to match the colouring now on the canvas.
+  renderLegend(legendBody, renderer.colorMode);
 });
+
+// --- Legend ---
+//
+// A folding key for the canvas colours/washes, built from the same palette the
+// renderer paints from. Rendered once on boot and rebuilt whenever the creature
+// colouring flips between trophic and lineage.
+const legendBody = document.getElementById("legend-body");
+renderLegend(legendBody, renderer.colorMode);
 
 const speedInput = document.getElementById("speed");
 const speedLabel = document.getElementById("speed-label");
