@@ -11,8 +11,15 @@ import assert from "node:assert";
 import { World } from "../src/world.js";
 import { makeRng } from "../src/rng.js";
 import { CONFIG } from "../src/config.js";
-import { plantKindAt, kindYieldFactor, kindRhythm, kindLabel } from "../src/plants.js";
+import {
+  plantKindAt,
+  kindYieldFactor,
+  kindRhythm,
+  kindClimateRhythm,
+  kindLabel,
+} from "../src/plants.js";
 import { daylight } from "../src/daycycle.js";
+import { seasonLevel, weatherNoise } from "../src/weather.js";
 
 const period = CONFIG.dayNight.periodSeconds;
 const noon = 0; // the world starts at noon (full daylight)
@@ -55,47 +62,125 @@ const close = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
   }
 }
 
-// --- The two kinds peak in opposite halves of the cycle: kind 0 (sunleaf) pays
-//     best by day, kind 1 (moonleaf) by night. This opposite-phase trade-off is
-//     the whole point — which forage specialism pays shifts with the clock.
+// --- The two kinds peak in opposite halves of the *daily* cycle: kind 0
+//     (sunleaf) by day, kind 1 (moonleaf) by night. Tested on the daily rhythm
+//     directly (isolated from the slow climate axis), since that opposite-phase
+//     trade-off is the whole point — which forage specialism pays shifts with the
+//     clock.
 {
   assert.ok(
-    kindYieldFactor(0, noon) > kindYieldFactor(0, midnight),
-    "the day-lit kind is worth more at noon than at midnight",
+    kindRhythm(0, noon) > kindRhythm(0, midnight),
+    "the day-lit kind's daily rhythm is higher at noon than at midnight",
   );
   assert.ok(
-    kindYieldFactor(1, midnight) > kindYieldFactor(1, noon),
-    "the night kind is worth more at midnight than at noon",
+    kindRhythm(1, midnight) > kindRhythm(1, noon),
+    "the night kind's daily rhythm is higher at midnight than at noon",
   );
-  // At noon the day kind out-pays the night kind; at midnight it reverses — so a
+  // At noon the day kind leads on the daily axis; at midnight it reverses — so a
   // specialist's fortunes genuinely cross over the cycle rather than one kind
   // simply dominating always.
-  assert.ok(kindYieldFactor(0, noon) > kindYieldFactor(1, noon), "day kind leads at noon");
-  assert.ok(kindYieldFactor(1, midnight) > kindYieldFactor(0, midnight), "night kind leads at midnight");
+  assert.ok(kindRhythm(0, noon) > kindRhythm(1, noon), "day kind's daily rhythm leads at noon");
+  assert.ok(kindRhythm(1, midnight) > kindRhythm(0, midnight), "night kind's daily rhythm leads at midnight");
+  // The daily curve inherits the daylight curve's smooth shoulders (no hard
+  // switch): the dawn/dusk quarter sits strictly between the day and night
+  // extremes.
+  const dusk = period / 4;
+  assert.ok(close(daylight(dusk), 0.5), "sanity: quarter point is half-lit");
+  for (const kind of [0, 1]) {
+    const hi = Math.max(kindRhythm(kind, noon), kindRhythm(kind, midnight));
+    const lo = Math.min(kindRhythm(kind, noon), kindRhythm(kind, midnight));
+    const mid = kindRhythm(kind, dusk);
+    assert.ok(mid > lo && mid < hi, `kind ${kind} daily rhythm is intermediate at dusk`);
+  }
 }
 
-// --- kindYieldFactor is richness × rhythm, and a pure function of time.
+// --- kindYieldFactor is richness × daily rhythm × climate rhythm, and a pure
+//     function of time.
 {
   for (const kind of [0, 1]) {
     const energy = CONFIG.food.kindTraits[kind].energy;
     for (let t = 0; t <= period * 2; t += period / 13) {
       assert.ok(
-        close(kindYieldFactor(kind, t), energy * kindRhythm(kind, t)),
-        `kind ${kind} factor is energy × rhythm at t=${t}`,
+        close(kindYieldFactor(kind, t), energy * kindRhythm(kind, t) * kindClimateRhythm(kind, t)),
+        `kind ${kind} factor is energy × daily × climate at t=${t}`,
       );
     }
   }
   // Pure in time: same time → same value, regardless of anything else.
   assert.ok(close(kindYieldFactor(1, 7.5), kindYieldFactor(1, 7.5)), "pure function of time");
-  // It inherits the daylight curve's smooth shoulders (no hard switch): the
-  // dawn/dusk quarter sits strictly between the day and night extremes.
-  const dusk = period / 4;
-  assert.ok(close(daylight(dusk), 0.5), "sanity: quarter point is half-lit");
+}
+
+// --- kindClimateRhythm: the slow season × weather tilt. The two kinds lean
+//     opposite ways (sunleaf → summer rain, moonleaf → winter drought), so on the
+//     climate axis their fortunes cross over with the seasons just as they do
+//     with the hour. Each tilt is centred (a boost in the preferred climate, an
+//     equal thinning in the other) and averages to ~1 over a year, so the larder
+//     isn't made leaner long-run.
+{
+  const seasonYear = CONFIG.weather.seasonSeconds;
+  const wPeriod = CONFIG.weather.periodSeconds;
+  const midsummer = 0; // seasonLevel ≈ 1
+  const midwinter = seasonYear / 2; // seasonLevel ≈ 0
+  assert.ok(close(seasonLevel(midsummer), 1, 1e-6), "sanity: midsummer is peak warmth");
+  assert.ok(close(seasonLevel(midwinter), 0, 1e-6), "sanity: midwinter is trough warmth");
+
+  // The weather noise isn't periodic, so isolate the season axis by averaging the
+  // climate rhythm over a window several weather periods wide centred on each
+  // solstice: the weather tilt averages out (it's mean-symmetric) and the season
+  // tilt remains, since the season barely moves over so short a window.
+  const seasonMean = (kind, centre) => {
+    let sum = 0;
+    let n = 0;
+    for (let t = centre - 3 * wPeriod; t <= centre + 3 * wPeriod; t += wPeriod / 40) {
+      sum += kindClimateRhythm(kind, t);
+      n++;
+    }
+    return sum / n;
+  };
+  const sunSummer = seasonMean(0, midsummer);
+  const sunWinter = seasonMean(0, midwinter);
+  const moonSummer = seasonMean(1, midsummer);
+  const moonWinter = seasonMean(1, midwinter);
+  assert.ok(sunSummer > sunWinter, "sunleaf's climate yield is richer (on average) in summer than winter");
+  assert.ok(moonWinter > moonSummer, "moonleaf's climate yield is richer (on average) in winter than summer");
+  // The two kinds cross over across the year: sunleaf leads the seasonal average
+  // in summer, moonleaf in winter.
+  assert.ok(sunSummer > moonSummer, "sunleaf leads the seasonal average in summer");
+  assert.ok(moonWinter > sunWinter, "moonleaf leads the seasonal average in winter");
+
+  // Weather also bites within a season: holding the season ~fixed (a short span
+  // near an equinox where warmth ≈ 0.5), the rain-leaning sunleaf out-yields the
+  // drought-leaning moonleaf in the wettest sampled spell and under-yields it in
+  // the driest.
+  const equinox = seasonYear / 4; // seasonLevel ≈ 0.5
+  assert.ok(close(seasonLevel(equinox), 0.5, 1e-6), "sanity: quarter-year is mid warmth");
+  let wettest = equinox;
+  let driest = equinox;
+  for (let t = equinox; t <= equinox + 10 * wPeriod; t += wPeriod / 30) {
+    if (weatherNoise(t) > weatherNoise(wettest)) wettest = t;
+    if (weatherNoise(t) < weatherNoise(driest)) driest = t;
+  }
+  assert.ok(
+    kindClimateRhythm(0, wettest) > kindClimateRhythm(1, wettest),
+    "the rain-leaning sunleaf out-yields the drought-leaning moonleaf in the wettest spell",
+  );
+  assert.ok(
+    kindClimateRhythm(1, driest) > kindClimateRhythm(0, driest),
+    "the drought-leaning moonleaf out-yields the rain-leaning sunleaf in the driest spell",
+  );
+
+  // Centred: averaged densely over a full year (both season and weather sweeping
+  // through their ranges many times), each kind's climate rhythm sits near 1, so
+  // the long-run larder is unchanged.
   for (const kind of [0, 1]) {
-    const hi = Math.max(kindYieldFactor(kind, noon), kindYieldFactor(kind, midnight));
-    const lo = Math.min(kindYieldFactor(kind, noon), kindYieldFactor(kind, midnight));
-    const mid = kindYieldFactor(kind, dusk);
-    assert.ok(mid > lo && mid < hi, `kind ${kind} yield is intermediate at dusk`);
+    let sum = 0;
+    let n = 0;
+    for (let t = 0; t < seasonYear; t += seasonYear / 4000) {
+      sum += kindClimateRhythm(kind, t);
+      n++;
+    }
+    const mean = sum / n;
+    assert.ok(Math.abs(mean - 1) < 0.04, `kind ${kind} climate rhythm averages ~1 over a year (${mean})`);
   }
 }
 

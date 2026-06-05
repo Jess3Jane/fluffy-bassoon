@@ -9,10 +9,13 @@
 //     against the day-night cycle.
 //
 // The second part is the point: each kind has its own energy richness and its
-// own daily rhythm (which half of the cycle it grows richest in). A "sunleaf"
-// (kind 0) is lean but dependable and pays best by day; a "moonleaf" (kind 1) is
-// rich but fickle and pays best by night. So which forage specialism wins shifts
-// with the clock — a clade must track the cycle, or hedge as a generalist for a
+// own set of rhythms — a fast daily one (which half of the day it grows richest
+// in) *and* a slow climate one (which season and weather it thrives in). A
+// "sunleaf" (kind 0) is lean but dependable, pays best by day, and thrives in
+// summer rain; a "moonleaf" (kind 1) is rich but fickle, pays best by night, and
+// thrives in winter drought. The two kinds pull opposite ways on every axis, so
+// which forage specialism wins crosses over with the hour, the season, *and* the
+// weather — a clade must track all of them, or hedge as a generalist for a
 // steadier but convex-discounted return, instead of settling on either band for
 // good. Like the day-night cycle these are pure functions of sim-time (plus the
 // pellet's kind/position), so they add no serialized state, stay bit-identical
@@ -20,6 +23,7 @@
 
 import { CONFIG } from "./config.js";
 import { daylight } from "./daycycle.js";
+import { seasonLevel, weatherNoise } from "./weather.js";
 
 // Which of the two plant kinds (0 or 1) sprouts at a point. Two offset sine
 // bands carve the world into smooth ~quarter-size patches of each kind, so the
@@ -32,19 +36,16 @@ export function plantKindAt(x, y) {
 }
 
 // The multiplier on the energy a creature extracts from a plant of `kind` right
-// now — the two halves of each kind's traits combined: its static `energy`
-// richness times a `temporal` factor that rides the day-night cycle. A kind is
-// "in phase" when the cycle is in its preferred half (day for a `dayLit` kind,
-// night otherwise); in phase the temporal factor is 1, and out of phase it dips
-// toward `1 − rhythmDepth` (a deep-rhythm kind becoming nearly worthless at the
-// wrong hour). The alignment is the daylight level itself (or its complement),
-// so it inherits the raised-cosine's smooth dawn/dusk shoulders rather than
-// switching hard. Multiplied into a grazer's yield in `World.forageNear`, so it
-// scales *how much energy* a plant is worth without touching *whether* a forager
-// will eat it (that stays the time-independent `forageYield` specialism gate) —
-// a specialist still works its own kind at the lean hour, just for less.
+// now — all three of each kind's rhythms combined: its static `energy` richness,
+// times the fast day-night `kindRhythm`, times the slow `kindClimateRhythm`
+// (season × weather). A grazer's yield in `World.forageNear` is scaled by this,
+// so it sets *how much energy* a plant is worth without touching *whether* a
+// forager will eat it (that stays the time-independent `forageYield` specialism
+// gate) — a specialist still works its own kind at the lean hour, lean season, or
+// lean spell, just for less. Pure in sim-time, so it adds no serialized state.
 export function kindYieldFactor(kind, time) {
-  return CONFIG.food.kindTraits[kind === 1 ? 1 : 0].energy * kindRhythm(kind, time);
+  const energy = CONFIG.food.kindTraits[kind === 1 ? 1 : 0].energy;
+  return energy * kindRhythm(kind, time) * kindClimateRhythm(kind, time);
 }
 
 // Just the day-night part of a kind's yield, in [1 − rhythmDepth, 1]: 1 when the
@@ -56,6 +57,27 @@ export function kindRhythm(kind, time) {
   const t = CONFIG.food.kindTraits[kind === 1 ? 1 : 0];
   const align = t.dayLit ? daylight(time) : 1 - daylight(time);
   return 1 - t.rhythmDepth * (1 - align);
+}
+
+// The slow climate part of a kind's yield: a season swing times a weather swing,
+// each a *centred* tilt around 1 (boost in the kind's own season/weather, equal
+// thinning in the other) rather than the daily rhythm's one-sided dip. A kind is
+// in its preferred season when warmth (`seasonLevel`, a raised cosine peaking at
+// midsummer) aligns with `seasonLit`, and in its preferred weather when the wet
+// level (the weather noise mapped to [0, 1]) aligns with `wetLit`. Because warmth
+// and the weather noise are both mean-symmetric, each tilt averages to ~1 over a
+// year — so this redistributes *when* a kind pays (a slow boom/bust opposite for
+// the two kinds, stacked on the daily one) without making the larder leaner in
+// the long run. Pure in sim-time, inheriting the smooth season/weather curves.
+export function kindClimateRhythm(kind, time) {
+  const t = CONFIG.food.kindTraits[kind === 1 ? 1 : 0];
+  const warmth = seasonLevel(time); // [0, 1], 1 at midsummer
+  const wet = (weatherNoise(time) + 1) / 2; // [0, 1], 1 at the height of a storm
+  const seasonAlign = t.seasonLit ? warmth : 1 - warmth;
+  const wetAlign = t.wetLit ? wet : 1 - wet;
+  const season = 1 + (t.seasonTilt ?? 0) * (2 * seasonAlign - 1);
+  const weather = 1 + (t.wetTilt ?? 0) * (2 * wetAlign - 1);
+  return season * weather;
 }
 
 // Short HUD label for a plant kind, matched to its renderer colour (kind 0 the

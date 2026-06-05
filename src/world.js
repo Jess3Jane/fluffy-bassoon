@@ -354,10 +354,12 @@ export class World {
       f.dead = true;
       count++;
       // Weight the energy by what this kind is worth *now*: its static richness
-      // and its day-night rhythm (`kindYieldFactor`). The specialism gate above
-      // is time-independent — a forager still eats its own kind at the lean hour
-      // — but a sunleaf at midnight (or a moonleaf at noon) pays far less, so the
-      // two kinds trade off against the clock instead of being interchangeable.
+      // times its day-night and climate (season × weather) rhythms
+      // (`kindYieldFactor`). The specialism gate above is time-independent — a
+      // forager still eats its own kind at the lean hour — but a sunleaf at
+      // midnight, in winter, or in a drought (or a moonleaf at the opposite)
+      // pays far less, so the two kinds trade off against the hour, the season,
+      // and the weather instead of being interchangeable.
       gained += yield_ * kindYieldFactor(f.kind, this.time);
     });
     return { count, gained };
