@@ -1025,6 +1025,86 @@ population dynamics, natural selection, and surprising behaviour.
       computation, the neutral fallback for a gene-less pellet, the null edges (no food,
       a one-sided larder), and that the readout draws no rng.
 
+- [x] **The spatial canopy sort is realised — the standing larder now actually
+      diverges, not just the selection target.** The condition-dependent optimum (above)
+      made the canopy a sprout is *selected toward* climb on barren soil and fall on
+      fertile, but the `canopySort` readout confirmed the *realised* standing larder
+      sat in the noise (≈0, sign random across seeds): the only channel acting on the
+      gene was *differential seeding* (germination shaping which random spot gets a
+      sprout), and it turned out far too weak — swamped by the ±0.05/gen mutation and
+      the fine terrain mosaic, the larder just parked at the mutation-centred 0.5. Two
+      reasons the seeding channel is weak surfaced along the way and reorder the levers
+      the prior seed laid out: the spawn probability is `terrain.fertility · germination`
+      fed through `rng.chance`, which **clamps at 1**, so on the fertile/grass majority
+      of the map (fertility 0.85–1.0) germination saturated the cap across most of the
+      canopy range — *no* differential at all there; and the 6-attempt spawn retry
+      further blunts what's left. So this took **two changes**, only the second of which
+      moved the needle:
+      • Lever (a), **a canopy-steep harsh-side differential** (`harshShelterLinear` in
+        `src/vegetation.js`): a *non-saturating* (linear-in-canopy) shelter bonus added
+        to `canopyGermination`, switched on only above the reference harshness, so on
+        barren soil high canopy keeps gaining shelter past where the saturating `tanh`
+        flattens. It lifts the barren optimum (~0.41 → ~0.51) and keeps the harsh curve
+        *steep* rather than a tall plateau — the differential the prior seed named as
+        the precondition. It vanishes at `harshnessRef`, so the harshness-omitted
+        `canopyGermination(c)` call reproduces the old curve byte-for-byte and the
+        established global selection (and every one-arg `canopy.test.mjs` assertion) is
+        preserved. (The companion option the seed offered — a *benign-side* fecundity
+        tilt to un-clamp the fertile end of the spawn channel — was implemented and
+        swept, and **rejected**: it did steepen benign selection, but by suppressing
+        food on the food-rich majority of the map it starved populations into extinction
+        (4/16 seeds) for a marginal sort gain. The finding: you cannot realise this sort
+        through the spawn channel without taxing the larder the whole world lives on.)
+      • The lever that actually realises it: **direct viability selection on the
+        standing larder** (`canopyViability` + a withering pass in `World.update`).
+        Each step a plant has a `witherRate · (1 − viability)` chance of being culled,
+        where viability is its germination at its location normalised by the best
+        achievable there (`canopyViability` = `canopyGermination(c, h) / max_c`), so it
+        is 1 exactly at the local optimum and falls as `canopyAmp` mismatches the
+        ground. Culling the mismatched pulls the *standing* distribution straight onto
+        the local optimum — heavy on barren, light on fertile — instead of nudging it
+        through the noisy seeding rate, which is the whole reason it works where the
+        seeding channel didn't. Two guards keep it from harming the world: it
+        **self-limits on larder fullness** (the rate tapers to 0 below
+        `witherFoodSoftCap`, so what it removes ∝ rate·food falls *quadratically* as
+        food drops and vanishes well before the larder is bare — culling can never drive
+        a starvation spiral), and the **wither roll draws the main rng** so a restored
+        world replays bit-for-bit (the dead are swept by the existing end-of-step
+        compaction; no serialized state, no `SAVE_VERSION` bump — at `witherRate` 0 the
+        pass is skipped and the world is exactly as before).
+      Lever (b), **tighter canopy dispersal**, rode along: `inheritRadius` shrank
+      90 → 40 and `parentCanopyAt` now falls back to the nearest *any*-kind parent (then
+      neutral only if nothing is in reach) rather than resetting to neutral — canopy is
+      adapted to the kind-independent terrain harshness, so copying a near off-kind
+      neighbour keeps a patch's adaptation across a kind boundary where a hard neutral
+      reset would wash a tight reach back to the mean (the prior seed's explicit
+      warning). The headline result, a clean 16-seed × 12-minute sweep: with withering
+      **off** the realised `canopySort` is noise (mean 0.001, sign random, 7/13
+      survivors positive); with it **on** the sort is positive on **all 16/16 seeds**
+      (mean 0.045, range +0.004…+0.127), with **zero extinctions** (vs 3–5/16 for the
+      base world — withering doesn't worsen, and the food gate may even help), a healthy
+      boom/bust band (pop to ~210) and active predation (~620 kills) intact. So a walk
+      across the map now shows visibly heavier canopy on barren ground, the feedback
+      gain sorting with the biome the way `warmthPref` / `forage` already do. The
+      `Canopy sort` HUD row reads it live; the renderer needs no change (its amber/blue
+      climate wash already breathes with the now-divergent feedback strength). Tests:
+      `canopy.test.mjs` gains the `canopyViability` curve (1 at each local optimum,
+      bounded in (0, 1], higher for heavy canopy on harsh ground and light on benign);
+      `canopy-sort.test.mjs` gains the withering wiring (a mismatched cohort is culled
+      far harder than a matched one, and `witherRate` 0 leaves both intact); the
+      `canopy-niche.test.mjs` monotonicity/interior-optimum and `canopy.test.mjs` global
+      recovery and save-replay assertions all still hold. (One unrelated test needed a
+      robustness fix: `scent.test.mjs` broke its kill loop on the *first* danger plume,
+      assuming it came from the kill — but the rng-stream shift from the wither rolls let
+      a voluntary "cry-wolf" alarm plume fire a step earlier; it now runs the full window
+      and tracks whether a danger plume ever appeared, which still proves the kill's
+      blood plume.)
+      *Caveat / deeper cut still open:* the realised sort (~0.045) is real and robust but
+      modest — the barren bucket holds near its ~0.51 optimum while the benign bucket
+      settles around the grass optimum (~0.33), so the *gap* is intrinsically limited by
+      how close those optima sit (pushing them apart via the benign spawn channel
+      starves the world, as found above). Widening it further is lever (c) below.
+
 ## Next up
 
 - [ ] **UI/UX, continued.** Two passes have landed — a *creature inspector* and
@@ -1039,41 +1119,27 @@ population dynamics, natural selection, and surprising behaviour.
       (e) **two-finger pinch follow-ups** — the camera handles pinch/pan, but a
       *follow-selected* mode (keep the inspected creature centred as it moves) and
       smooth zoom inertia would round it out.
-- [ ] **Realise the spatial canopy sort — make the standing larder actually
-      diverge, not just the selection target.** The condition-dependent optimum has
-      landed (above): the canopy a sprout is selected toward now climbs on barren
-      soil and falls on fertile, so the *gradient* sorts with the biome. But at the
-      current scale the *realised* `canopyAmp` distribution barely tracks it —
-      dispersal (a sprout inherits the nearest same-kind parent within
-      `inheritRadius`, which spans a couple of terrain tiles and mixes barren and
-      fertile lineages) plus drift swamp the gentle pull, so the standing larder's
-      barren-vs-fertile mean canopy is noisy and near-flat. Close that gap so a walk
-      across the map shows visibly heavier canopy on barren ground. The
-      **barren-vs-fertile readout is now in** (the `Canopy sort` row / `canopySort`
-      stat — see Done above), and it has already settled what *won't* work: a sweep of
-      the two cheap levers below (dispersal reach × harshness gain, plus a
-      neutral-reset fix) left the realised sort in the noise. The readout also
-      pinpointed *why*, which reorders the levers — the bottleneck is **not** dispersal
-      but the *shape of the selection on harsh ground*: the condition-dependent
-      shelter term scales the whole germination curve *up* on barren soil but
-      **saturates in canopy** there (germination at canopy 0.8 is ~0.94× that at 0.2),
-      so the barren optimum is real but has almost no gradient pulling plants to it.
-      So the cheap dispersal/gain knobs concentrate a selection signal that barely
-      exists. Reordered levers: (a) **a canopy-steep harsh-side differential** — make
-      the shelter benefit on harsh ground depend on canopy *non-saturatingly* (or
-      raise the fecundity cost specifically where it's benign) so high canopy is
-      meaningfully fitter than low *on barren soil*, not just globally higher — the
-      precondition the others all need; then (b) **tighter canopy dispersal** to keep
-      that now-real local adaptation in its patch (shrink `inheritRadius` / weight to
-      the very nearest parent, *without* the neutral-reset that washes a tight reach
-      back to the mean); and the deeper cut (c) **kin-structured canopy as a public
-      good** — the shelter benefit shared only among lineage neighbours (echoing the
-      scent-signalling kinship work), so investment is defended against cheaters
-      patch-by-patch, which both steepens the differential and ties it to dispersal at
-      once. Watch the global equilibrium and the `canopy.test.mjs` curve assertions
-      while reshaping the harsh-side curve — keep the harshness-omitted
-      `canopyGermination(c)` call reproducing the old optimum so the established global
-      selection is preserved. Or pick a seed below.
+- [ ] **Widen the realised canopy sort — kin-structured canopy as a public good.**
+      The spatial sort is now *realised* (above): viability withering pulls barren
+      stands onto heavy canopy and fertile stands onto light, a robust +0.045 across
+      every seed. But the gap is modest, capped by how close the two ground types'
+      optima sit (~0.51 barren vs ~0.33 grass) — and the one cheap way to push them
+      apart (a benign-side fecundity tilt) starves the world, as found above. The
+      deeper cut the prior seed flagged is still open and is the natural next step:
+      make the canopy shelter benefit a **public good shared only among lineage
+      neighbours** (echoing the scent/kin-signalling work — `kinship`,
+      `hueSimilarity`). Today a plant's canopy shelters *any* seedling germinating
+      nearby (and, via withering, only its own viability depends on its canopy); tie
+      the *facilitation* term to whether the sheltering stand is kin, so heavy canopy
+      pays off only where relatives cluster. That defends investment against free-
+      riders patch-by-patch and ties the differential to dispersal at once, which
+      should both steepen the harsh-side selection (a non-saturating, kin-gated shelter
+      that can climb higher without starving strangers' ground) and let the barren
+      optimum diverge further from the benign one without taxing the global larder.
+      Watch the global equilibrium and the `canopy*.test.mjs` curve/recovery
+      assertions while reshaping the shelter term — keep the kin-free /
+      harshness-omitted `canopyGermination(c)` call reproducing the old optimum so the
+      established global selection is preserved. Or pick a seed below.
 
 ## Ideas / someday
 

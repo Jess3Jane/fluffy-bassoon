@@ -25,7 +25,12 @@ import {
 } from "./weather.js";
 import { Terrain } from "./terrain.js";
 import { Microclimate } from "./microclimate.js";
-import { VegetationField, canopyGermination, inheritCanopy } from "./vegetation.js";
+import {
+  VegetationField,
+  canopyGermination,
+  canopyViability,
+  inheritCanopy,
+} from "./vegetation.js";
 import { ScentField } from "./scent.js";
 import {
   plantKindAt,
@@ -247,25 +252,40 @@ export class World {
   }
 
   // The canopy investment a sprout at (x, y) inherits: the `canopyAmp` of the
-  // nearest same-kind plant within `inheritRadius` (its parent), or the neutral
-  // gene if none is in reach (a pioneer founding a fresh stand). Read off the
-  // step-boundary `canopyGrid`, so it's deterministic and replays identically from
-  // a restored save. Single-parent inheritance is the point: it preserves a
-  // mutant's deviation across generations so selection (`canopyGermination`) can
-  // actually act on the trait, where a regional mean would just wash it out.
+  // nearest same-kind plant within `inheritRadius` (its parent); failing that the
+  // nearest plant of *any* kind in reach; and only the neutral gene if nothing at
+  // all is near (a true pioneer founding a fresh stand). Read off the step-boundary
+  // `canopyGrid`, so it's deterministic and replays identically from a restored
+  // save. Single-parent inheritance is the point: it preserves a mutant's deviation
+  // across generations so selection (`canopyGermination`) can actually act on the
+  // trait, where a regional mean would just wash it out.
+  //
+  // The any-kind fallback is what lets `inheritRadius` be tightened (the dispersal
+  // half of realising the spatial canopy sort) without the trait collapsing: canopy
+  // investment is adapted to the *terrain's* harshness, which is kind-independent, so
+  // copying a near off-kind neighbour's investment keeps a patch's local adaptation
+  // intact across a kind boundary far better than resetting to neutral — a hard reset
+  // would wash a tight reach straight back to the mean.
   parentCanopyAt(x, y, kind) {
     const radius = CONFIG.vegetation.canopy.inheritRadius;
     let best = null;
     let bestD = radius * radius;
+    let anyBest = null;
+    let anyBestD = radius * radius;
     this.canopyGrid.forEachNear(x, y, radius, (f) => {
-      if (f.dead || (f.kind === 1 ? 1 : 0) !== kind) return;
+      if (f.dead) return;
       const d = wrapDistSq(x, y, f.x, f.y, this.width, this.height);
-      if (d < bestD) {
+      if (d < anyBestD) {
+        anyBestD = d;
+        anyBest = f;
+      }
+      if ((f.kind === 1 ? 1 : 0) === kind && d < bestD) {
         bestD = d;
         best = f;
       }
     });
-    return best ? best.canopyAmp ?? CONFIG.vegetation.canopy.neutral : CONFIG.vegetation.canopy.neutral;
+    const parent = best ?? anyBest;
+    return parent ? parent.canopyAmp ?? CONFIG.vegetation.canopy.neutral : CONFIG.vegetation.canopy.neutral;
   }
 
   // How hard a spot is for a seedling, in [0, 1] (0 benign → 1 harsh) — the local
@@ -519,6 +539,40 @@ export class World {
     // Index the step-boundary larder so each sprout below can inherit canopy from
     // its nearest same-kind parent (see `parentCanopyAt`).
     this.canopyGrid.rebuild(this.food);
+
+    // Canopy viability selection: a standing plant whose `canopyAmp` is poorly
+    // matched to its local seedling harshness withers (is culled) faster, so the
+    // standing larder is pulled *directly* onto the local canopy optimum. This is
+    // what realises the spatial canopy sort — the differential-seeding channel alone
+    // proved far too weak (mutation and the fine terrain mosaic swamped it, leaving
+    // the larder at the mutation-centred 0.5), so selection acts on the standing
+    // plant, not only the seeding rate. A plant at its local optimum has viability 1
+    // and never withers from mismatch; the wither chance scales with `1 − viability`.
+    // The roll draws the main rng, so a restored world replays bit-identically (the
+    // dead are swept by the existing end-of-step compaction). At `witherRate` 0 the
+    // pass is skipped and the world behaves exactly as before.
+    const witherRate = CONFIG.vegetation.canopy.witherRate;
+    if (witherRate > 0) {
+      // Self-limit on larder fullness so culling never drives a starvation spiral:
+      // the rate tapers to 0 as the larder empties, so what it removes (∝ rate · food)
+      // falls *quadratically* with the food count and vanishes well before the larder
+      // is bare. Full strength once the larder is comfortably stocked (≥ softCap), so
+      // the sort is realised during the booms and simply pauses through the lean
+      // troughs the climate already throttles growth in — withering never outpaces
+      // regrowth and tips a struggling population over.
+      const fill = Math.min(1, this.food.length / CONFIG.vegetation.canopy.witherFoodSoftCap);
+      const rate = witherRate * fill * dt;
+      if (rate > 0) {
+        for (const f of this.food) {
+          if (f.dead) continue;
+          const v = canopyViability(
+            f.canopyAmp ?? CONFIG.vegetation.canopy.neutral,
+            this.canopyHarshnessAt(f.x, f.y),
+          );
+          if (this.rng.chance(rate * (1 - v))) f.dead = true;
+        }
+      }
+    }
 
     // Grow food over time, scaled by two rhythms: the day-night cycle (fast by
     // day, slow at night) and the slower season × weather climate (rich summers

@@ -3,17 +3,21 @@
 // ground vs. benign (fertile/grass) — and their difference (`canopySort`). This is
 // the instrument the condition-dependent canopy work asked for: the germination
 // curve selects for heavier canopy where seedlings struggle, so a positive sort
-// means the realised standing larder actually tracks that gradient. (At the current
-// population scale it reads ≈0 — dispersal and drift swamp the gentle gradient —
-// so the readout's job is to make that absence, or a future divergence, legible.)
+// means the realised standing larder actually tracks that gradient. The sort is now
+// genuinely realised by *viability selection* (`canopyViability` + `World.update`'s
+// withering): a plant mismatched to its local harshness is culled, pulling the
+// standing distribution onto the local optimum — heavier on barren, lighter on
+// fertile — where the gentle differential-seeding channel alone left it at ≈0.
 //
 // Covers: the harsh/benign bucketing at `harshnessRef`; the two means and the
 // signed sort against a hand computation; the null edges (no food, an empty
-// bucket); and that the readout is pure observation — it draws no rng, so it never
-// perturbs the deterministic stream. Pure logic over a hand-placed larder, no DOM.
+// bucket); that the readout is pure observation (draws no rng); and that withering
+// actually culls mismatched plants (and at `witherRate` 0 leaves them alone). Pure
+// logic over a hand-placed larder, no DOM.
 
 import assert from "node:assert";
 import { World } from "../src/world.js";
+import { canopyGermination } from "../src/vegetation.js";
 import { makeRng } from "../src/rng.js";
 import { CONFIG } from "../src/config.js";
 
@@ -100,6 +104,69 @@ function harshAndBenignSpots(world) {
   const s = world.stats();
   assert.equal(world.rng.getState(), before, "stats() draws no rng");
   assert.ok(Number.isFinite(s.canopySort), "the sort is a finite number, never NaN");
+}
+
+// --- Withering wiring: `World.update` culls a plant mismatched to its local
+//     harshness much faster than a well-matched one, and at `witherRate` 0 leaves
+//     both alone. This is the mechanism that realises the sort. ---
+{
+  const argmaxCanopy = (h) => {
+    let a = 0, p = -Infinity;
+    for (let c = 0; c <= 1.00001; c += 0.002) {
+      const g = canopyGermination(c, h);
+      if (g > p) { p = g; a = c; }
+    }
+    return a;
+  };
+
+  // Place equal cohorts of well-matched (canopy at the local optimum) and badly-
+  // mismatched (canopy 1.0, far above a benign optimum) plants on the same benign
+  // spot, run a few steps, and count how many of each *original* pellet survives.
+  // No creatures (seed: false), so grazing doesn't muddy the count; food growth adds
+  // unrelated pellets, which we ignore by tracking the cohorts by reference.
+  const stockCohorts = (world) => {
+    const { benign } = harshAndBenignSpots(world);
+    const opt = argmaxCanopy(benign.h);
+    const matched = [], mismatched = [];
+    for (let i = 0; i < 130; i++) {
+      const m = { x: benign.x, y: benign.y, kind: 0, canopyAmp: opt };
+      const x = { x: benign.x, y: benign.y, kind: 0, canopyAmp: 1.0 };
+      matched.push(m); mismatched.push(x);
+      world.food.push(m, x);
+    }
+    return { matched, mismatched };
+  };
+  const surviving = (world, cohort) => {
+    const live = new Set(world.food);
+    return cohort.filter((f) => live.has(f) && !f.dead).length;
+  };
+
+  // With withering on, the mismatched cohort is culled far harder than the matched one.
+  {
+    const world = new World(makeRng(7), { seed: false });
+    const { matched, mismatched } = stockCohorts(world);
+    for (let i = 0; i < 30; i++) world.update(1 / 30);
+    const mAlive = surviving(world, matched);
+    const xAlive = surviving(world, mismatched);
+    assert.ok(mAlive > xAlive, `matched plants outlast mismatched (matched ${mAlive} > mismatched ${xAlive})`);
+    assert.ok(xAlive < matched.length * 0.5, `most mismatched plants are withered (mismatched ${xAlive}/${mismatched.length})`);
+    assert.ok(mAlive > matched.length * 0.8, `well-matched plants are largely spared (matched ${mAlive}/${matched.length})`);
+  }
+
+  // With witherRate 0, the pass is skipped: neither cohort is culled by mismatch.
+  {
+    const saved = CONFIG.vegetation.canopy.witherRate;
+    CONFIG.vegetation.canopy.witherRate = 0;
+    try {
+      const world = new World(makeRng(7), { seed: false });
+      const { matched, mismatched } = stockCohorts(world);
+      for (let i = 0; i < 30; i++) world.update(1 / 30);
+      assert.equal(surviving(world, matched), matched.length, "no withering: matched cohort intact");
+      assert.equal(surviving(world, mismatched), mismatched.length, "no withering: mismatched cohort intact");
+    } finally {
+      CONFIG.vegetation.canopy.witherRate = saved;
+    }
+  }
 }
 
 console.log("canopy-sort.test.mjs ✓");

@@ -63,26 +63,90 @@ import { clamp01 } from "./math.js";
 // now a selected trait, not a constant.
 //
 // The shelter benefit is *condition-dependent*: `harshness` (in [0, 1], 0 benign →
-// 1 harsh) scales the facilitation term about a reference, so the optimum is not a
+// 1 harsh) tilts the facilitation term about a reference, so the optimum is not a
 // single global band but *diverges with the local conditions* — shelter pays its
 // fecundity cost on harsh (barren) ground, where the optimum climbs, and doesn't on
 // benign (fertile) ground, where cheap seeding wins and the optimum falls. At
-// `harshnessRef` the scale is exactly 1, so the default (harshness-omitted) call
+// `harshnessRef` the tilt vanishes, so the default (harshness-omitted) call
 // reproduces the old curve, and the world is unchanged where conditions sit at the
-// reference. A neutral/absent parent reads as no net effect only to the extent the
-// two terms cancel there; the curve is otherwise the whole story (see
-// `test/canopy.test.mjs` for its shape and `test/canopy-niche.test.mjs` for the
-// harshness-driven shift and the spatial sorting it produces).
+// reference.
+//
+// Harshness tilts the shelter through two terms — the original level tilt plus a new
+// *non-saturating* one, the lesson of the spatial-canopy-sort work:
+//   • `facScale` — the original level tilt on the saturating `tanh` shelter (up on
+//     harsh, down on benign). It moves the curve's *height* (and its optimum) but,
+//     because `tanh` saturates, barely its *steepness*: high canopy on barren ground
+//     was only ~0.94× as fit as low, so the spatial selection *differential* — what
+//     dispersal and drift have to concentrate to realise a standing sort — was tiny.
+//   • `harshShelterLinear` — a *non-saturating* (linear-in-canopy) shelter bonus that
+//     switches on only above the reference (`harshExcess`), so on barren soil high
+//     canopy keeps gaining shelter past where the `tanh` flattens. This lifts the
+//     barren optimum and, crucially, keeps the harsh curve *steep* (not a tall
+//     plateau), so high canopy is meaningfully fitter than low there — the precondition
+//     the realised sort needed (the task's lever (a)).
+// Both vanish at `harshnessRef`, so the default (harshness-omitted) call reproduces the
+// old curve exactly (see `test/canopy.test.mjs` for its shape and `test/canopy-niche.test.mjs`
+// for the harshness-driven shift). (A companion benign-side fecundity tilt was tried —
+// steepening the cost on fertile ground to also un-clamp the benign end of the spawn
+// probability — but it starved the food-rich majority of the map and tipped populations
+// into extinction, so the realisation instead leans on direct viability selection,
+// `canopyViability` below, which doesn't depend on the saturating spawn channel.)
 export function canopyGermination(c, harshness = CONFIG.vegetation.canopy.harshnessRef) {
   const cfg = CONFIG.vegetation.canopy;
   const fecundity = Math.max(0, 1 - cfg.fecundityCost * c);
-  // Local harshness tilts the shelter benefit: harsher than the reference makes
-  // canopy worth more (a steeper, higher-peaking curve), benign makes it worth
-  // less. Clamped ≥ 0 so an extreme-benign spot zeroes the benefit rather than
-  // inverting it into a shelter *penalty*.
+  // How much harsher than the reference this ground is (0 at/below it), gating the
+  // non-saturating harsh-side bonus so benign and reference ground are untouched.
+  const harshExcess = Math.max(0, harshness - cfg.harshnessRef);
+  // Level tilt: harsher than the reference makes canopy worth more (a higher-peaking
+  // curve), benign makes it worth less. Clamped ≥ 0 so an extreme-benign spot zeroes
+  // the benefit rather than inverting it into a shelter *penalty*.
   const facScale = Math.max(0, 1 + cfg.harshnessGain * (harshness - cfg.harshnessRef));
-  const shelter = 1 + cfg.facilitation * facScale * Math.tanh(cfg.facilitationSlope * c);
+  const shelter =
+    1 +
+    cfg.facilitation * facScale * Math.tanh(cfg.facilitationSlope * c) +
+    // Non-saturating harsh-side bonus: keeps high canopy gaining shelter on barren
+    // soil past where the tanh flattens, so the harsh curve is steep (not just tall).
+    cfg.harshShelterLinear * harshExcess * c;
   return fecundity * shelter;
+}
+
+// The peak germination achievable at a given harshness (the value at the local
+// optimum), memoised per harshness keyed on the curve's tuning so it stays correct
+// if the config is changed between calls (as a test may do). Harshness is effectively
+// a handful of terrain-driven values, so the cache stays tiny and every call after
+// warmup is a map lookup. Used only to *normalise* viability below; it never changes
+// the germination curve itself.
+const _germMaxCache = new Map();
+function canopyGermMax(harshness) {
+  const cfg = CONFIG.vegetation.canopy;
+  const key = `${Math.round(harshness * 1e4)}|${cfg.fecundityCost}|${cfg.facilitation}|${cfg.facilitationSlope}|${cfg.harshnessGain}|${cfg.harshnessRef}|${cfg.harshShelterLinear}`;
+  let m = _germMaxCache.get(key);
+  if (m === undefined) {
+    m = 0;
+    for (let c = 0; c <= 1.00001; c += 0.01) {
+      const g = canopyGermination(c, harshness);
+      if (g > m) m = g;
+    }
+    _germMaxCache.set(key, m);
+  }
+  return m;
+}
+
+// A standing plant's *viability* at its location, in (0, 1]: its germination value
+// for the local harshness divided by the best achievable there, so it is 1 exactly
+// at the local canopy optimum and falls off as the plant's `canopyAmp` mismatches
+// what that ground rewards. This is the lever that finally *realises* the spatial
+// canopy sort: the differential-seeding channel (germination shaping which random
+// spot gets a sprout) turned out far too weak — swamped by mutation and the fine-
+// grained terrain mosaic, the standing larder just sat at the mutation-centred 0.5.
+// `World.update` instead withers a plant each step with a chance proportional to
+// `1 − viability`, so a plant badly matched to its ground is *culled directly* and
+// the standing distribution is pulled onto the local optimum (strong, local viability
+// selection) rather than nudged through the noisy seeding rate. A plant sitting at its
+// local optimum never withers from mismatch; the further off, the faster it goes.
+export function canopyViability(c, harshness) {
+  const max = canopyGermMax(harshness);
+  return max > 0 ? canopyGermination(c, harshness) / max : 1;
 }
 
 // A new sprout's canopy gene: its nearest same-kind parent's investment (read off
