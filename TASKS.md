@@ -868,6 +868,7 @@ population dynamics, natural selection, and surprising behaviour.
 
 ## Next up
 
+- [ ] UI/UX
 - [ ] **Make the canopy optimum condition-dependent**, so niche construction
       diverges across the map instead of settling to one global band. Right now the
       facilitation/fecundity balance (and so the evolved `canopyAmp`) is the same
