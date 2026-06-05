@@ -300,6 +300,35 @@ export const CONFIG = {
     // washing it out. Larger values only erode that sorting for little extra gain.
     warmthAmplitude: 0.08, // peak warmth nudge (±) a dense single-kind stand adds
     wetnessAmplitude: 0.07, // peak wetness nudge (±) a dense single-kind stand adds
+
+    // The feedback's *strength* is no longer a flat per-kind constant — each
+    // pellet carries a heritable `canopyAmp` gene (in [0, 1]) for how strongly it
+    // shapes its understory climate, so a plant lineage can *invest* in niche
+    // construction (entrench its biome harder) or coast, and selection tunes the
+    // loop's own gain rather than the config fixing it. A stand's lean vote is
+    // scaled by `canopyAmp / neutral` — so a plant at `neutral` votes the old ±1
+    // (the established feedback strength is unchanged where the trait sits at its
+    // reference) and over- / under-investers shape the field more / less strongly.
+    //
+    // The trait is genuinely heritable: a new sprout inherits the *nearest* same-
+    // kind plant's investment (the parent, found within `inheritRadius` off a grid
+    // rebuilt at the step boundary), mutated by `mutationStep` — so a mutant's
+    // deviation survives to be selected on rather than being smeared back into a
+    // regional mean. Two opposing pressures shape it, so an interior optimum
+    // *emerges* from the balance rather than being dialled in: a **fecundity cost**
+    // (building canopy diverts from seeding, so a sprout's germination falls
+    // linearly with its parent's investment) pulls it down toward cheap, light-
+    // touch seeding, while a **facilitation benefit** (a parent's own canopy
+    // shelters its seedlings — a private, saturating return) pulls it up. A pioneer
+    // with no parent in reach starts at `neutral`.
+    canopy: {
+      neutral: 0.5, // start / fallback / vote reference (a neutral plant votes ±1)
+      mutationStep: 0.05, // std-dev of the per-inheritance drift of the canopy gene
+      inheritRadius: 90, // a sprout copies the nearest same-kind plant within this reach
+      fecundityCost: 0.55, // germination ∝ (1 − fecundityCost·canopy): cheap seeding favours low
+      facilitation: 1.4, // peak germination bonus a parent's canopy gives its seedlings
+      facilitationSlope: 3, // how fast that (saturating) shelter benefit ramps with canopy
+    },
   },
 
   // Scent / pheromone plumes: a drifting chemical field laid down by living

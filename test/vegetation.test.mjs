@@ -184,7 +184,7 @@ function clump(x, y, kind, n) {
   const world = new World(makeRng(31));
   for (let i = 0; i < 200; i++) world.update(1 / 60);
   const blob = JSON.parse(JSON.stringify(world.serialize()));
-  assert.equal(blob.version, 11, "the vegetation feedback adds no SAVE_VERSION bump");
+  assert.equal(blob.version, 12, "save version covers the heritable canopy gene");
   assert.equal(blob.vegetation, undefined, "the vegetation field is not serialized (it's recomputed)");
 
   const restored = World.deserialize(blob, makeRng());
@@ -195,9 +195,9 @@ function clump(x, y, kind, n) {
   // The larder (positions and kinds) — grown through the feedback on both — must
   // match pellet-for-pellet.
   assert.deepEqual(
-    restored.food.map((f) => [Math.round(f.x * 1e6), Math.round(f.y * 1e6), f.kind]),
-    world.food.map((f) => [Math.round(f.x * 1e6), Math.round(f.y * 1e6), f.kind]),
-    "the larder replays bit-identically across save/load under the feedback",
+    restored.food.map((f) => [Math.round(f.x * 1e6), Math.round(f.y * 1e6), f.kind, Math.round(f.canopyAmp * 1e6)]),
+    world.food.map((f) => [Math.round(f.x * 1e6), Math.round(f.y * 1e6), f.kind, Math.round(f.canopyAmp * 1e6)]),
+    "the larder (positions, kinds, and canopy genes) replays bit-identically across save/load",
   );
   assert.equal(world.creatures.length, restored.creatures.length, "the population replays identically too");
   // And the rebuilt vegetation fields agree sample-for-sample.

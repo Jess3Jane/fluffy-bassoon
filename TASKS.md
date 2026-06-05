@@ -815,16 +815,70 @@ population dynamics, natural selection, and surprising behaviour.
       and its no-food / amp-0 fallbacks, that `update` rebuilds from the live
       larder, and the no-new-state bit-identical save/load replay.
 
+- [x] The vegetation feedback's **strength is now heritable**, so the loop's own
+      gain evolves under selection instead of being a flat per-kind constant. Every
+      pellet carries a `canopyAmp` gene (`src/genome.js`'s siblings live in
+      `src/vegetation.js`; the gene rides the food serialization in `[0, 1]`) for
+      how strongly it shapes its understory microclimate, and `VegetationField.rebuild`
+      scales each plant's lean vote by `canopyAmp / neutral` — so a plant sitting at
+      the `neutral` reference votes the old ±1 (the established feedback strength is
+      preserved where the trait rests) while an over-/under-invester shapes the
+      field more/less. The trait is *genuinely heritable*: a new sprout copies its
+      **nearest same-kind parent's** investment (`World.parentCanopyAt`, off a
+      dedicated `canopyGrid` rebuilt at the *step boundary* — kept apart from
+      `foodGrid`, which is rebuilt after spawning, so the parent lookup reads the
+      exact larder a save captures), mutated by `inheritCanopy`. Single-parent
+      inheritance is the crux and the lesson of a first false start: a regional-mean
+      inheritance (binning canopy onto a lattice and copying the cell average)
+      *washed every mutant straight back to the mean*, pinning the trait inert at
+      its start value no matter the selection — only copying a near-parent preserves
+      a deviation long enough for selection to act on it. Two opposing pressures
+      then shape the gene through one source-of-truth germination curve
+      (`canopyGermination`): a **fecundity cost** (building canopy diverts from
+      seed, so germination falls linearly with the parent's investment) pulls it
+      down toward cheap, light-touch seeding, while a **facilitation benefit** (a
+      parent's own canopy shelters its seedlings — a private, *saturating* return)
+      pulls it up; their product peaks at an interior investment the population
+      evolves toward. Crucially the equilibrium is **emergent, not dialled in**: a
+      10-minute headless sweep shows the mean canopy pulled back to an interior band
+      (~0.5) from *both* a forced 0.1 *and* a forced 0.9 within ~2 minutes of
+      selection — the clean signature of a heritable trait under stabilising
+      selection, not a constant. Because that band sits near the neutral reference,
+      the established microclimate/biome feedback is left intact at equilibrium while
+      now being actively *defended* (and free to diverge transiently as stands are
+      grazed down and refound). The cost/benefit and inheritance draw on the main
+      rng (the gene rides the existing food serialization), so a restored world
+      replays bit-identically; `SAVE_VERSION` → 12 (food now serializes as
+      `[x, y, kind, canopyAmp]`; a pre-v12 pellet lacks the gene, so its lean vote
+      and germination would be NaN — the save is rejected). A 12-minute × 12-seed
+      run holds the same boom/bust band as before (survivors 94–183 pop, active
+      predation 500–1400 kills, 2–7 coexisting ecotypes, no NaNs). `stats()`
+      surfaces the standing larder's mean `canopy` and the HUD shows a **Canopy**
+      row; the renderer needs no change — its amber/blue climate wash already
+      breathes with the now-evolved feedback strength for free. `test/canopy.test.mjs`
+      covers the germination curve (the bare-1 at zero investment, the interior
+      optimum beating both extremes, non-negativity, the steeper-cost response),
+      inheritance (parent-centred mean, the [0, 1] clamp at the rails), the
+      nearest-parent lookup (same-kind nearest, off-kind skipped, neutral fallback
+      for a pioneer), the canopy-scaled vote (neutral == legacy ±1, heavy > light),
+      the `spawnFood` wiring (explicit sprouts inherit the local stand), the `stats`
+      readout, the **selection itself** (recovery toward the interior from both 0.1
+      and 0.9 in a living world), and the v12 save round-trip (gene preserved,
+      bit-identical replay, a pre-v12 save rejected).
+
 ## Next up
 
-- [ ] **Make the vegetation feedback's strength heritable / trait-driven** instead
-      of a flat per-kind constant — e.g. a plant gene (or a per-kind `canopyAmp`)
-      for how strongly a stand shapes its microclimate, so a clade can *invest* in
-      niche construction (entrench its biome harder) at some cost, and selection
-      can tune the feedback rather than the config fixing it. That would let the
-      loop's own gain evolve — runaway-entrenching lineages vs. light-touch ones —
-      on top of the boundary sharpening/drift it already produces. Or pick a seed
-      below.
+- [ ] **Make the canopy optimum condition-dependent**, so niche construction
+      diverges across the map instead of settling to one global band. Right now the
+      facilitation/fecundity balance (and so the evolved `canopyAmp`) is the same
+      everywhere; tie the *shelter* benefit to where seedlings actually struggle —
+      e.g. stronger facilitation on barren terrain, in harsh microclimates, or under
+      heavy grazing — so a clade evolves heavy canopy where entrenching pays and
+      light canopy where it doesn't, and the feedback gain becomes a *spatial* trait
+      that sorts with the biome (the way `warmthPref`/`forage` already do). A
+      kin-structured variant (canopy as a public good sustained only among lineage
+      neighbours, echoing the scent-signalling kinship work) is the deeper cut. Or
+      pick a seed below.
 
 ## Ideas / someday
 

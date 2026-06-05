@@ -119,6 +119,7 @@ function updateHud() {
     row("Wetness pref", s.avg.wetnessPref.toFixed(2)),
     row("Climate sort", climateSortRow(s)),
     row("Biome", s.biomeSort == null ? "—" : s.biomeSort.toFixed(2)),
+    row("Canopy", s.canopy == null ? "—" : s.canopy.toFixed(2)),
     divider(),
     row("Food voice", s.avg.foodVoice.toFixed(2)),
     row("Alarm voice", s.avg.alarmVoice.toFixed(2)),
