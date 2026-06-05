@@ -909,19 +909,64 @@ population dynamics, natural selection, and surprising behaviour.
       like the renderer and main entry point — they're exercised by hand rather
       than in the headless suite.
 
+- [x] **UI/UX: a pan/zoom camera** (follow-up (a) to the inspector), so a large
+      world can be explored up close — the inspector highlight made *following* one
+      creature meaningful, but you still couldn't get *near* it. A pure `Camera`
+      (`src/camera.js`) holds a `zoom` and a world-space centre and resolves the
+      renderer's existing `{ scale, offsetX, offsetY }` transform triple each frame
+      (`Camera.view`), so the draw pass and `screenToWorld` are unchanged in shape —
+      they just read a camera-resolved transform instead of a fixed one. The crux is
+      that it's a clean *generalisation* of the old fit: at `zoom` 1 with a null
+      centre it falls out **byte-for-byte identical** to the previous
+      letterbox-the-world-to-the-viewport mapping (the test asserts the scale and
+      both offsets against an independent recomputation, incl. the centred margin on
+      the non-limiting axis), so the default view is exactly as before and the
+      feature is purely additive. Zoom is clamped to `[1, 12]` — you can't zoom out
+      past the whole-world fit — and the centre is clamped so the visible window
+      never leaves `[0, world]`; on an axis where the world can't fill the view (the
+      letterboxed axis, or any axis at zoom 1) the centre is pinned dead-centre,
+      which is what reproduces the old letterboxing. `Camera.zoomAt(factor, sx, sy)`
+      zooms while pinning the world point under a screen pixel (zoom-toward-cursor /
+      pinch-focus — it clamps zoom *first*, so a focus-zoom against the rail just
+      stops rather than drifting the centre), and `panByWorld` / `panByScreen` move
+      the centre (the latter keeping a grabbed point under the dragging pointer).
+      A `CameraController` owns the browser input and is deliberately kept *out of
+      the editing brushes' way*: the brushes own a single primary-button (left /
+      one-finger) stroke, while the camera claims everything else — the **wheel**
+      (zoom toward the cursor), **middle/right-drag** and **two-finger pinch-and-pan**
+      (pan + zoom about the centroid), the **arrow keys** (pan) and **+/−** (zoom),
+      plus an on-screen **+ / − / ⤢** cluster (bottom-right) that also covers touch
+      and discoverability. The two controllers never fight over a gesture: the
+      `ToolController` independently tracks its active pointers and abandons any
+      stroke the instant a second pointer joins (a pinch) or a non-primary button is
+      used, each controller maintaining its own pointer set off the shared canvas
+      events rather than coordinating. The renderer keeps drawing the whole world in
+      world-space under the camera transform — the canvas clips to the viewport for
+      free, so a zoomed view costs nothing extra. Purely a *view*: it draws no rng,
+      adds no serialized state, and touches no simulation logic (no `SAVE_VERSION`
+      bump), so every existing replay/save test passes untouched. `test/camera.test.mjs`
+      covers the pure maths headlessly — the zoom-1 fit reproduction (scale + both
+      offsets, limiting vs. letterboxed axis), the screen↔world round-trip, the
+      zoom and centre clamping (both edges, the pinned letterboxed/limiting axis),
+      `zoomAt` pinning the focus pixel (and staying clamped against the rail), and
+      `panByWorld` / `panByScreen` moving the view (the grabbed point following the
+      drag); the DOM input wiring needs a browser, so — like the renderer, tools, and
+      main entry point — it's exercised by hand rather than in the headless suite.
+
 ## Next up
 
-- [ ] **UI/UX, continued.** A first pass landed a *creature inspector* (below);
-      natural follow-ups: (a) a **camera** — pan/zoom the canvas so a large world
-      can be explored up close (the inspector highlight makes following one
-      creature meaningful, but you still can't get near it); (b) **collapsible
+- [ ] **UI/UX, continued.** Two passes have landed — a *creature inspector* and
+      now a *pan/zoom camera* (both below); remaining follow-ups: (b) **collapsible
       stat groups** in the left HUD — the ~35 rows are now scrollable but still a
       flat wall, so fold them into labelled `<details>` sections (Population /
       Climate / Niche / Social) the way the inspector groups its genome; (c)
       **click-through inspector links** — jump from a creature to its nearest kin
-      or its current target; (d) a **legend** for the canvas colours/washes
-      (trophic vs. lineage, the amber/blue climate wash, the green/violet plant
-      kinds), which are currently undocumented in-app.
+      or its current target (now that the camera can zoom to it); (d) a **legend**
+      for the canvas colours/washes (trophic vs. lineage, the amber/blue climate
+      wash, the green/violet plant kinds), which are currently undocumented in-app;
+      (e) **two-finger pinch follow-ups** — the camera handles pinch/pan, but a
+      *follow-selected* mode (keep the inspected creature centred as it moves) and
+      smooth zoom inertia would round it out.
 - [ ] **Make the canopy optimum condition-dependent**, so niche construction
       diverges across the map instead of settling to one global band. Right now the
       facilitation/fecundity balance (and so the evolved `canopyAmp`) is the same

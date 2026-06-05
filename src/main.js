@@ -2,6 +2,7 @@
 
 import { World } from "./world.js";
 import { Renderer } from "./renderer.js";
+import { Camera, CameraController } from "./camera.js";
 import { Creature } from "./creature.js";
 import { CONFIG } from "./config.js";
 import { GENES } from "./genome.js";
@@ -19,7 +20,8 @@ const FIXED_DT = 1 / 60; // simulation step, seconds
 const MAX_FRAME = 0.1; // clamp huge gaps (e.g. tab was backgrounded)
 
 const canvas = document.getElementById("world");
-const renderer = new Renderer(canvas);
+const camera = new Camera();
+const renderer = new Renderer(canvas, camera);
 const charts = new Charts(document.getElementById("charts"));
 
 let world;
@@ -416,6 +418,31 @@ toolBtn.addEventListener("click", () => {
   toolBtn.textContent = "Tool: " + TOOL_LABELS[tools.tool];
   canvas.style.cursor = tools.tool === "inspect" ? "pointer" : "crosshair";
 });
+
+// --- Camera ---
+//
+// Pan/zoom over the world, layered on top of the renderer's fit-to-viewport
+// transform. The controller owns the wheel, middle/right-drag, two-finger
+// pinch/pan, and arrow keys; the on-screen +/−/reset cluster covers touch and
+// discoverability. The editing brushes keep the single primary-button stroke.
+const cameraControls = new CameraController({
+  canvas,
+  camera,
+  renderer,
+  getWorld: () => world,
+});
+
+// How hard each on-screen +/- button click zooms — a bigger step than a wheel
+// notch so a tap moves a useful amount.
+const CAMERA_BUTTON_STEP = 1.4;
+
+document
+  .getElementById("zoom-in")
+  .addEventListener("click", () => cameraControls.zoomCentre(CAMERA_BUTTON_STEP));
+document
+  .getElementById("zoom-out")
+  .addEventListener("click", () => cameraControls.zoomCentre(1 / CAMERA_BUTTON_STEP));
+document.getElementById("zoom-reset").addEventListener("click", () => camera.reset());
 
 // --- Boot ---
 

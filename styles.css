@@ -119,6 +119,31 @@ button:disabled:hover { background: rgba(111, 211, 199, 0.12); }
   line-height: 1.5;
 }
 
+/* --- Camera controls (bottom-right): zoom in / out / reset view --- */
+
+#camera-controls {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 5;
+}
+
+#camera-controls button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 17px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel);
+  backdrop-filter: blur(6px);
+}
+
 /* --- Creature inspector (top-right) --- */
 
 #inspector {

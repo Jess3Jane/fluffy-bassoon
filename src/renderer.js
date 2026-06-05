@@ -26,10 +26,15 @@ const FOOD_COLORS = ["#3f7d52", "#7d6fb0"];
 const MICROCLIMATE_CELLS = 32;
 
 export class Renderer {
-  constructor(canvas) {
+  constructor(canvas, camera) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // The pan/zoom camera resolves the world→screen transform each frame; at its
+    // default (zoom 1, world centre) it reproduces the old letterboxed fit.
+    this.camera = camera;
+    this.viewW = window.innerWidth;
+    this.viewH = window.innerHeight;
     this.scale = 1;
     this.offsetX = 0;
     this.offsetY = 0;
@@ -51,13 +56,22 @@ export class Renderer {
     this.canvas.height = h * this.dpr;
     this.canvas.style.width = w + "px";
     this.canvas.style.height = h + "px";
+    this.viewW = w;
+    this.viewH = h;
 
-    // Fit the world rectangle inside the viewport, centred.
-    const sx = w / CONFIG.world.width;
-    const sy = h / CONFIG.world.height;
-    this.scale = Math.min(sx, sy);
-    this.offsetX = (w - CONFIG.world.width * this.scale) / 2;
-    this.offsetY = (h - CONFIG.world.height * this.scale) / 2;
+    // Resolve the transform now (against the default world size) so a pointer
+    // event landing before the first draw still maps correctly; `draw()` then
+    // re-resolves it against the live world each frame.
+    this.applyCamera(CONFIG.world.width, CONFIG.world.height);
+  }
+
+  // Pull the current world→screen transform from the camera into the fields the
+  // draw pass and `screenToWorld` read.
+  applyCamera(worldW, worldH) {
+    const t = this.camera.view(worldW, worldH, this.viewW, this.viewH);
+    this.scale = t.scale;
+    this.offsetX = t.offsetX;
+    this.offsetY = t.offsetY;
   }
 
   // Convert a screen/client point into world coordinates.
@@ -70,6 +84,9 @@ export class Renderer {
 
   draw(world) {
     const ctx = this.ctx;
+    // Re-resolve the camera transform for the live world, so pan/zoom and any
+    // world-size change take effect this frame.
+    this.applyCamera(world.width, world.height);
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 

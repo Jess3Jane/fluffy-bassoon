@@ -44,6 +44,11 @@ export class ToolController {
     this.painting = false;
     this.lastX = 0;
     this.lastY = 0;
+    // Ids of pointers currently down on the canvas. A brush owns a single
+    // primary-button (left / one-finger) stroke; the moment a second pointer
+    // joins, the gesture belongs to the camera (pinch/pan), so the stroke is
+    // abandoned rather than fighting it.
+    this.pointers = new Set();
 
     canvas.addEventListener("pointerdown", (e) => this.onDown(e));
     canvas.addEventListener("pointermove", (e) => this.onMove(e));
@@ -65,6 +70,15 @@ export class ToolController {
   }
 
   onDown(e) {
+    this.pointers.add(e.pointerId);
+    // Middle/right buttons drive the camera pan, not a brush stroke.
+    if (e.button === 1 || e.button === 2) return;
+    // A second pointer turns the gesture into a camera pinch/pan — drop any
+    // stroke in progress and don't start one.
+    if (this.pointers.size > 1) {
+      this.painting = false;
+      return;
+    }
     const p = this.worldPoint(e);
     if (!p) return;
     e.preventDefault();
@@ -101,6 +115,7 @@ export class ToolController {
   }
 
   onUp(e) {
+    this.pointers.delete(e.pointerId);
     if (!this.painting) return;
     this.painting = false;
     this.canvas.releasePointerCapture?.(e.pointerId);
