@@ -116,8 +116,13 @@ const H = 800;
   small.genome.diet = 0;
   small.genome.size = 0.6;
   const killsBefore = world.kills;
+  // Run the whole window rather than breaking on the first danger plume: a creature
+  // can lay a *voluntary* alarm ("cry wolf") plume too, which — depending on the rng
+  // stream — may fire a step before the kill's involuntary blood plume, so an early
+  // break could exit before the kill itself lands. Track whether a danger plume was
+  // ever seen across the window instead, which still proves the kill's blood plume.
   let sawDanger = false;
-  for (let i = 0; i < 120 && !sawDanger; i++) {
+  for (let i = 0; i < 120; i++) {
     world.update(1 / 60);
     if (world.scent.plumes.some((p) => p.kind === SCENT.DANGER)) sawDanger = true;
   }

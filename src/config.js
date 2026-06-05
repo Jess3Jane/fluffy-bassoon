@@ -324,7 +324,12 @@ export const CONFIG = {
     canopy: {
       neutral: 0.5, // start / fallback / vote reference (a neutral plant votes ±1)
       mutationStep: 0.05, // std-dev of the per-inheritance drift of the canopy gene
-      inheritRadius: 90, // a sprout copies the nearest same-kind plant within this reach
+      // A sprout copies the nearest same-kind plant within this reach (the nearest
+      // *any*-kind plant as a fallback, neutral only if nothing is in reach). Kept
+      // tight so a barren patch's heavy-canopy adaptation isn't washed out by
+      // inheriting across the boundary from the surrounding fertile/grass lineages —
+      // the dispersal half of realising the spatial canopy sort.
+      inheritRadius: 40,
       fecundityCost: 0.55, // germination ∝ (1 − fecundityCost·canopy): cheap seeding favours low
       facilitation: 1.4, // peak germination bonus a parent's canopy gives its seedlings (at reference harshness)
       facilitationSlope: 3, // how fast that (saturating) shelter benefit ramps with canopy
@@ -340,7 +345,31 @@ export const CONFIG = {
       // one global band. At `harshnessRef` the scale is exactly 1, so the curve (and
       // a default, harshness-free `canopyGermination(c)` call) matches the old tuning.
       harshnessRef: 0.3, // reference harshness where the shelter benefit equals `facilitation`
-      harshnessGain: 2.4, // how strongly local harshness scales the shelter benefit (clamped ≥ 0)
+      harshnessGain: 2.4, // how strongly local harshness scales the (saturating) shelter benefit (clamped ≥ 0)
+      // `harshnessGain` scales the *level* of the saturating shelter on harsh ground
+      // but barely steepens it (tanh flattens), so high canopy stayed only marginally
+      // fitter than low on barren soil and the realised sort sat in the noise. This
+      // adds a *non-saturating* (linear-in-canopy) shelter bonus that only switches on
+      // above `harshnessRef`, so on barren ground high canopy keeps gaining shelter past
+      // the tanh plateau — a real selection differential to realise — while benign and
+      // reference ground (where the excess is 0) are untouched.
+      harshShelterLinear: 5, // strength of the non-saturating harsh-side shelter bonus per unit harshness past the reference
+      // Direct viability selection on the *standing* larder — what finally realises
+      // the spatial canopy sort. The differential-seeding channel (germination shaping
+      // which random spot gets a sprout) proved far too weak: swamped by mutation and
+      // the fine terrain mosaic, the standing larder just sat at the mutation-centred
+      // 0.5, and curve-shaping (a steeper harsh-side differential, a benign fecundity
+      // tilt) couldn't move it — the latter only starved the food-rich majority of the
+      // map into extinction. Instead, each second a plant has a `witherRate · (1 −
+      // viability)` chance of being culled, where viability (`canopyViability`) is 1 at
+      // its location's canopy optimum and falls as `canopyAmp` mismatches it. Culling
+      // the mismatched pulls the standing distribution directly onto the local optimum,
+      // so barren ground keeps the heavy-canopy plants it selects for and fertile ground
+      // the light ones. The rate self-limits on larder fullness (`witherFoodSoftCap`)
+      // so it can never strip a struggling larder. At `witherRate` 0 the pass is skipped
+      // and the world is exactly as before.
+      witherRate: 1.5, // per-second cull rate at zero viability (scaled by 1 − viability)
+      witherFoodSoftCap: 220, // larder size at/above which withering runs at full strength; it tapers to 0 below, so culling can't strip a struggling larder
     },
   },
 

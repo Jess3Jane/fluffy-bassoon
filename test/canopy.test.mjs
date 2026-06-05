@@ -13,6 +13,7 @@ import { World } from "../src/world.js";
 import {
   VegetationField,
   canopyGermination,
+  canopyViability,
   inheritCanopy,
 } from "../src/vegetation.js";
 import { makeRng } from "../src/rng.js";
@@ -49,6 +50,45 @@ const NEUTRAL = CONFIG.vegetation.canopy.neutral;
   CONFIG.vegetation.canopy.fecundityCost = saved * 2;
   assert.ok(canopyGermination(0.9) < before, "a steeper fecundity cost lowers high-canopy germination");
   CONFIG.vegetation.canopy.fecundityCost = saved;
+}
+
+// --- Viability: a standing plant's relative fitness at its location, in (0, 1],
+//     peaking at 1 exactly at the local optimum and falling off as the gene
+//     mismatches it. This is what `World.update` withers against to realise the sort. ---
+{
+  const cfg = CONFIG.vegetation.canopy;
+  const argmaxCanopy = (h) => {
+    let a = 0, p = -Infinity;
+    for (let c = 0; c <= 1.00001; c += 0.002) {
+      const g = canopyGermination(c, h);
+      if (g > p) { p = g; a = c; }
+    }
+    return a;
+  };
+
+  for (const h of [0, 0.15, cfg.harshnessRef, 0.7, 1]) {
+    // It is a normalised germination, so it never exceeds 1 and is 1 at the optimum.
+    for (let c = 0; c <= 1.00001; c += 0.05) {
+      const v = canopyViability(c, h);
+      assert.ok(v > 0 && v <= 1 + 1e-9, `viability stays within (0, 1] (h=${h}, c=${c.toFixed(2)})`);
+    }
+    const opt = argmaxCanopy(h);
+    assert.ok(close(canopyViability(opt, h), 1, 1e-3), `viability is 1 at the local optimum (h=${h})`);
+    // Off the optimum it drops — a plant far from what its ground rewards is less viable.
+    assert.ok(canopyViability(opt, h) > canopyViability(opt < 0.5 ? 1 : 0, h), `viability falls off the optimum (h=${h})`);
+  }
+
+  // The optimum (viability 1) sits higher on harsh ground than benign, so withering
+  // pulls barren stands toward heavier canopy and fertile stands toward lighter —
+  // the realised sort. A mid canopy is more viable on barren than on fertile ground.
+  assert.ok(
+    canopyViability(0.6, 0.7) > canopyViability(0.6, 0.0),
+    "heavy canopy is more viable on harsh ground than benign",
+  );
+  assert.ok(
+    canopyViability(0.15, 0.0) > canopyViability(0.15, 0.7),
+    "light canopy is more viable on benign ground than harsh",
+  );
 }
 
 // --- Inheritance: a sprout copies its parent's investment with a small mutation,
