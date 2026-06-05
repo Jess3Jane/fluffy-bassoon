@@ -250,6 +250,13 @@ Or just use the deployed GitHub Pages site.
   HUD only ever averages become tangible. The picked creature is ringed on the
   canvas with its sense reach traced, so it's easy to follow through the crowd;
   the selection clears when it dies, and *Esc* (or the panel's ×) dismisses it.
+- **Pan & zoom** the view to explore a large world up close (so following one
+  creature via the Inspect highlight finally means getting near it). **Scroll**
+  to zoom toward the cursor, **right- or middle-drag** (or **two fingers**) to
+  pan, the **arrow keys** to nudge and **+ / −** to zoom; an on-screen
+  **+ / − / ⤢** cluster (bottom-right) does the same and resets the view. Zoom 1
+  is the original whole-world fit and you can't pan past the world edges; the
+  camera is purely a view, so it changes nothing about the simulation or the save.
 - **Pause / Resume**, **Reset**, and a **Speed** slider (1×–8×) in the HUD.
 - **Save / Load** snapshot the world to this browser's localStorage and restore
   it later. Because the random-number generator's state is saved too, a loaded
