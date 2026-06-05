@@ -222,7 +222,25 @@ button:disabled:hover { background: rgba(111, 211, 199, 0.12); }
   letter-spacing: 0.3px;
 }
 
+#inspector-follow {
+  flex: none;
+  padding: 2px 7px;
+  font-size: 10.5px;
+  line-height: 1.2;
+  letter-spacing: 0.2px;
+}
+
+/* The follow toggle reads as "engaged" when on — filled accent, dark glyph. */
+#inspector-follow.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+
+#inspector-follow.on:hover { background: var(--accent); }
+
 #inspector-close {
+  flex: none;
   padding: 1px 8px;
   font-size: 14px;
   line-height: 1;
