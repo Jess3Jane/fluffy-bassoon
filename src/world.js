@@ -705,6 +705,16 @@ export class World {
     // spread; null with no food. Pure observation — no rng, no feedback.
     let biomeScore = 0;
     let canopySum = 0;
+    // Split the standing larder's canopy investment by *local seedling harshness*
+    // — the very gradient the condition-dependent germination curve selects along
+    // (`canopyGermination`'s harshness arg, driven by terrain barrenness). The
+    // selection *target* climbs on harsh (barren) ground and falls on benign
+    // (fertile) ground; this reads back whether the *realised* standing larder
+    // actually tracks that. Bucketed at `harshnessRef` (the reference where the
+    // shelter benefit is unscaled), so "harsh" is ground at least as hard as the
+    // curve's pivot and "benign" the softer ground below it.
+    let harshCanopy = 0, harshN = 0, benignCanopy = 0, benignN = 0;
+    const harshnessRef = CONFIG.vegetation.canopy.harshnessRef;
     const biomeNorm = this.microclimate.warmthAmp + this.microclimate.wetnessAmp;
     for (const f of this.food) {
       foodByKind[f.kind === 1 ? 1 : 0]++;
@@ -713,7 +723,15 @@ export class World {
         this.microclimate.warmthOffsetAt(f.x, f.y),
         this.microclimate.wetnessOffsetAt(f.x, f.y),
       );
-      canopySum += f.canopyAmp ?? CONFIG.vegetation.canopy.neutral;
+      const amp = f.canopyAmp ?? CONFIG.vegetation.canopy.neutral;
+      canopySum += amp;
+      if (this.canopyHarshnessAt(f.x, f.y) >= harshnessRef) {
+        harshCanopy += amp;
+        harshN++;
+      } else {
+        benignCanopy += amp;
+        benignN++;
+      }
     }
     const biomeSort =
       this.food.length > 0 && biomeNorm > 0
@@ -723,6 +741,18 @@ export class World {
     // vegetation feedback): drifts up where entrenching the biome pays its
     // fecundity cost, down where cheap seeding wins. Null with no food.
     const canopy = this.food.length > 0 ? canopySum / this.food.length : null;
+    // The *realised* spatial canopy sort: mean canopy on harsh ground vs. benign,
+    // and their difference (`canopySort`, positive when barren stands invest more
+    // than fertile ones — the direction the selection target points). Each mean is
+    // null with no plants in that bucket, and the sort null unless both are
+    // populated. Pure observation: it draws no rng and feeds nothing back, so it
+    // never perturbs the deterministic stream. NB at the current population scale
+    // this reads ≈0 (dispersal and drift swamp the gentle germination gradient);
+    // it exists to make that absence — or a future realised divergence — legible.
+    const canopyHarsh = harshN > 0 ? harshCanopy / harshN : null;
+    const canopyBenign = benignN > 0 ? benignCanopy / benignN : null;
+    const canopySort =
+      canopyHarsh != null && canopyBenign != null ? canopyHarsh - canopyBenign : null;
     // What each plant kind is worth *right now* — its richness × day-night
     // rhythm — so the HUD can show which specialism the clock currently favours
     // (a sunleaf peaking by day, a moonleaf by night) beside the standing split.
@@ -769,6 +799,9 @@ export class World {
       climateSortWetness,
       biomeSort,
       canopy,
+      canopyHarsh,
+      canopyBenign,
+      canopySort,
       avg,
     };
   }
