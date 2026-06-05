@@ -3,7 +3,7 @@
 
 import { CONFIG } from "./config.js";
 import { daylight } from "./daycycle.js";
-import { kindRhythm } from "./plants.js";
+import { kindRhythm, kindClimateRhythm } from "./plants.js";
 import { weatherNoise, windStrength, windDirection } from "./weather.js";
 import { TILE } from "./terrain.js";
 import { SCENT } from "./scent.js";
@@ -84,15 +84,19 @@ export class Renderer {
     // Food. The two plant kinds draw in distinct hues — leafy green for kind 0,
     // violet for kind 1 — so the spatial patchwork the resource axis partitions
     // along is visible at a glance, and which kind a clade has settled onto reads
-    // straight off where it forages. Each kind is also faded by its day-night
-    // rhythm (`kindRhythm`): a sunleaf glows by day and dims at night, a moonleaf
-    // the reverse, so the shifting "which specialism pays now" reads on the field
-    // itself. One pass per kind keeps the fill set cheap.
+    // straight off where it forages. Each kind is also faded by its current
+    // yield rhythm — the fast day-night `kindRhythm` times the slow climate
+    // `kindClimateRhythm` (season × weather): a sunleaf glows by day and in a
+    // summer rain, dims at night and in a winter drought, a moonleaf the reverse,
+    // so the shifting "which specialism pays now" reads on the field itself across
+    // all three timescales. One pass per kind keeps the fill set cheap.
     for (let kind = 0; kind < FOOD_COLORS.length; kind++) {
       ctx.fillStyle = FOOD_COLORS[kind];
-      // Map the rhythm (in [1 − rhythmDepth, 1]) onto a visible alpha band so an
-      // out-of-phase patch fades without vanishing.
-      ctx.globalAlpha = 0.4 + 0.6 * kindRhythm(kind, world.time);
+      // Map the combined rhythm onto a visible alpha band so an out-of-phase
+      // patch fades without vanishing; clamp since the climate tilt can push the
+      // product above 1 in a kind's boom (a summer storm) — a glow, not an error.
+      const glow = kindRhythm(kind, world.time) * kindClimateRhythm(kind, world.time);
+      ctx.globalAlpha = Math.min(1, 0.4 + 0.6 * glow);
       for (const f of world.food) {
         if ((f.kind === 1 ? 1 : 0) !== kind) continue;
         ctx.beginPath();

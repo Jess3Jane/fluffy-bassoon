@@ -618,14 +618,42 @@ population dynamics, natural selection, and surprising behaviour.
       gains more in its own phase), the `stats()` readout, the HUD labels, and that
       it slips no state into the save (yields match after a round-trip).
 
+- [x] Make the *other* world rhythms tilt the plant kinds too, not just the
+      day-night cycle. The per-kind yield now rides three nested clocks instead of
+      one: `kindYieldFactor` (`src/plants.js`) is the static richness × the fast
+      day-night `kindRhythm` × a new slow `kindClimateRhythm` (season × weather).
+      Each kind carries a climate lean in `CONFIG.food.kindTraits`
+      (`seasonLit`/`seasonTilt`, `wetLit`/`wetTilt`), and the two pull opposite
+      ways on every axis: the day-leaning **sunleaf** also thrives in *summer
+      rain*, the night-leaning **moonleaf** in *winter drought*. So the dominant
+      forage specialism crosses over not just with the hour but with the season
+      and the weather, stacking a slow boom/bust on the daily one — a clade must
+      track all three cycles at once, or hedge harder as a generalist. Unlike the
+      day-night rhythm's one-sided dip, each climate tilt is a *centred* swing
+      (warmth via `seasonLevel`, wetness via `weatherNoise` mapped to [0,1]):
+      because both signals are mean-symmetric it averages to ~1 over a year, so it
+      redistributes *when* a kind pays without making the larder leaner long-run
+      (the test asserts the per-kind annual mean stays within 4% of 1). It stays a
+      **pure function of sim-time** like the layers it rides on, so it adds **no
+      serialized state** and no `SAVE_VERSION` bump, and replays bit-identically
+      across save/load. The renderer fades each kind's pellets by the *combined*
+      rhythm (daily × climate, clamped), so a sunleaf patch now glows in a summer
+      storm and dims in a winter drought as well as by day, making the boom/bust
+      read straight off the field. `test/plant-traits.test.mjs` gains coverage of
+      the climate cross-over (sunleaf richer in summer / wettest spell, moonleaf in
+      winter / driest spell, isolated from the daily axis), the centred annual
+      mean, and the three-way `energy × daily × climate` decomposition.
+
 ## Next up
 
-- [ ] Make the *other* world rhythms tilt the plant kinds too, not just the
-      day-night cycle: let `kindYieldFactor` (or a sibling) also key off season
-      and/or weather, so e.g. one kind thrives in summer rain and the other in
-      winter drought — stacking a slow boom/bust onto the daily one, so a clade
-      must track multiple cycles at once (or hedge harder as a generalist). Or
-      pick a seed below.
+- [ ] Give creatures a heritable *thermal/moisture tolerance* so the new climate
+      swings select on the animals directly, not only through their food: a gene
+      (or pair) setting a preferred warmth/wetness, with metabolism rising as the
+      current climate drifts from the preferred point — so winters cull the
+      summer-adapted and droughts the rain-adapted, and the climate becomes a
+      selective axis in its own right rather than purely a larder modulator. Pairs
+      naturally with the plant-kind climate leans (a summer-rain clade grazing
+      sunleaf vs. a winter-drought clade grazing moonleaf). Or pick a seed below.
 
 ## Ideas / someday
 

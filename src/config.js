@@ -22,30 +22,41 @@ export const CONFIG = {
     kinds: 2,
 
     // Per-kind traits — what makes the two kinds *more than a symmetric
-    // coin-flip*. Each kind has its own energy `richness` and its own daily
-    // rhythm, so which forage specialism pays shifts with the day-night cycle
-    // (`kindYieldFactor` in src/plants.js), and a clade must track the clock or
-    // hedge as a generalist instead of settling on either band for good:
+    // coin-flip*. Each kind has its own energy `richness`, its own daily rhythm,
+    // *and* its own climate (season + weather) lean, so which forage specialism
+    // pays shifts on three nested timescales at once (`kindYieldFactor` in
+    // src/plants.js): a clade must track all of them, or hedge as a generalist,
+    // instead of settling on either band for good.
     //   • `energy`     — static richness multiplier on `food.energy` for this
     //                    kind (lean vs. rich).
     //   • `dayLit`     — true if the kind grows richest by day, false by night;
     //                    its yield peaks in that half of the cycle and dips in
     //                    the other.
-    //   • `rhythmDepth`— how deeply the out-of-phase yield dips (0 = no daily
-    //                    swing, dependable; 1 = nearly worthless at the wrong
-    //                    hour, feast-or-famine).
-    // The result is an asymmetric pair: kind 0 a steady "sunleaf" (peaks a
-    // little by day, never far from its mean) and kind 1 a feast-or-famine
-    // "moonleaf" (a richer peak at midnight, but nearly worthless by day). The
+    //   • `rhythmDepth`— how deeply the out-of-phase *daily* yield dips (0 = no
+    //                    daily swing, dependable; 1 = nearly worthless at the
+    //                    wrong hour, feast-or-famine).
+    //   • `seasonLit`  — true if the kind thrives in summer (warmth), false if in
+    //                    winter (cold); `seasonTilt` is how hard the seasonal
+    //                    swing boosts it in its own season and thins it in the
+    //                    other (0 = season-blind).
+    //   • `wetLit`     — true if the kind thrives in rain, false in drought;
+    //                    `wetTilt` is how hard the weather swing boosts/thins it
+    //                    (0 = weather-blind).
+    // The result is an asymmetric pair pulling opposite ways on every axis: kind
+    // 0 a steady, day-leaning "sunleaf" that thrives in *summer rain*, and kind 1
+    // a feast-or-famine "moonleaf" that thrives in *winter drought*. The daily
     // energies are picked so each kind's yield *averaged over a full day* lands
-    // near 1 — so this layers a daily rhythm and a richness asymmetry onto the
-    // larder without making the world globally leaner (a day-grazer and a
-    // night-grazer earn about the same over a cycle; they just earn it at
-    // opposite hours), while a generalist trades the convex forage discount for
-    // a yield that rides neither swing.
+    // near 1; the season/weather tilts are centred swings (they average to ~1
+    // over a year, since warmth and the weather noise are mean-symmetric), so
+    // they redistribute *when* each kind pays without making the world globally
+    // leaner long-run — a slow boom/bust stacked on the daily one, opposite for
+    // the two kinds, so the dominant specialism crosses over with the seasons and
+    // the weather as well as the hour.
     kindTraits: [
-      { energy: 1.2, dayLit: true, rhythmDepth: 0.35 }, // kind 0 — sunleaf: steady, day-leaning
-      { energy: 1.5, dayLit: false, rhythmDepth: 0.7 }, // kind 1 — moonleaf: rich but night-only
+      // kind 0 — sunleaf: steady, day-leaning; thrives in summer rain.
+      { energy: 1.2, dayLit: true, rhythmDepth: 0.35, seasonLit: true, seasonTilt: 0.4, wetLit: true, wetTilt: 0.25 },
+      // kind 1 — moonleaf: rich but night-only; thrives in winter drought.
+      { energy: 1.5, dayLit: false, rhythmDepth: 0.7, seasonLit: false, seasonTilt: 0.4, wetLit: false, wetTilt: 0.25 },
     ],
 
     // Foraging specialism. A creature's heritable `forage` gene (0 → kind 0,
