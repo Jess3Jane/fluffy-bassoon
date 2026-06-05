@@ -66,6 +66,24 @@ world rather than only scattering it. Faint streaks rake the scene to show which
 way it's blowing. Drought is the calm, clear opposite — you see far and steer
 true, but go hungry.
 
+The climate also selects on the **animals directly**, not only through the larder
+they graze. Each creature carries a preferred warmth and wetness (`warmthPref` /
+`wetnessPref`), and its base metabolism rises with how far the present climate has
+drifted from that point — a summer-adapted body burns energy faster in deep
+winter, a rain-adapted one in a drought. So winters cull the summer-adapted and
+droughts the rain-adapted, and because sunleaf and moonleaf lean to opposite
+climates, a clade is pulled to match its tolerance to where its forage actually
+pays. And that climate has a **spatial** axis as well as the seasonal one: a
+static, per-region **microclimate** offset (grown from a seed like the terrain)
+makes one corner of the map run warmer or drier than another at the very same
+instant — a sun-baked, dry south; a cool, damp north. A creature is taxed against
+the climate *where it stands*, so the same preference genes now partition the
+population across the map — a warm-adapted clade settling the warm regions while a
+cold-adapted one holds the cool — and not only across the year. The ground washes
+faint amber where a region runs warm and blue where it runs cool, and the HUD's
+**Climate sort** row tracks how strongly the clades have settled into the climate
+that suits them.
+
 The world is laid over a **terrain** map of grassland dotted with patches of
 water, fertile soil, and barren ground. Food springs up thickest on fertile
 soil, sparsely on barren ground, and never on water; creatures wade slowly
@@ -224,7 +242,10 @@ Or just use the deployed GitHub Pages site.
   traits — including diet, the four heritable signalling traits (food/alarm
   voice and trust), `kinship` (how strongly the creature filters scent by the
   caller's lineage), `mating` (how readily it breeds sexually vs. clones), and
-  `mateChoice` (assortative vs. disassortative partner preference).
+  `mateChoice` (assortative vs. disassortative partner preference), and the
+  `warmthPref` / `wetnessPref` climate tolerances — plus a **Climate sort** row
+  reporting how strongly the population has settled into the microclimate it
+  prefers, per axis.
 - Four **history charts** in the HUD trace the world over time: a population
   panel (total population with the carnivore sub-band), an average-trait panel
   (diet plus speed/size normalised onto a shared 0–1 axis), a species panel (the

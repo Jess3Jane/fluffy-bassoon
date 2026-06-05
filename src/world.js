@@ -24,6 +24,7 @@ import {
   windDirection,
 } from "./weather.js";
 import { Terrain } from "./terrain.js";
+import { Microclimate } from "./microclimate.js";
 import { ScentField } from "./scent.js";
 import { plantKindAt, kindYieldFactor } from "./plants.js";
 
@@ -47,10 +48,14 @@ const MAX_CREATURE_RADIUS = CONFIG.creature.radius * GENES.size[1];
 // for prey-size specialism (a pre-v9 genome lacks it, so its predation yield
 // would be NaN-scaled). v10 added the `warmthPref` / `wetnessPref` climate-
 // tolerance genes (a pre-v10 genome lacks them, so its climate-stress metabolism
-// would be NaN). The mating-isolation ring added later is *not* a version bump:
-// it's pure readout state an older save can satisfy by simply loading empty, so
-// it degrades gracefully rather than rejecting the save (see `deserialize`).
-const SAVE_VERSION = 10;
+// would be NaN). v11 added the microclimate seed — a spatial offset to the
+// warmth/wetness a creature feels (a pre-v11 save carries no seed, so the local
+// climate would be NaN-offset); like the terrain seed it regrows the field
+// bit-for-bit, so only the number is stored. The mating-isolation ring added
+// later is *not* a version bump: it's pure readout state an older save can
+// satisfy by simply loading empty, so it degrades gracefully rather than
+// rejecting the save (see `deserialize`).
+const SAVE_VERSION = 11;
 
 export class World {
   // `seed: false` builds an empty world (no starting food/creatures, rng
@@ -79,6 +84,13 @@ export class World {
     this.terrainSeed = 0;
     this.terrain = new Terrain(this.width, this.height, this.terrainSeed);
 
+    // The microclimate: a static, per-region offset to the warmth/wetness a
+    // creature feels, layered under the global season/weather. Like the terrain
+    // it grows bit-for-bit from a single seed (drawn in `seed()`; defaulted here
+    // and replaced by the saved seed on load) and so needs no other state.
+    this.microclimateSeed = 0;
+    this.microclimate = new Microclimate(this.width, this.height, this.microclimateSeed);
+
     // The scent / pheromone field: drifting plumes creatures lay as they feed
     // and die, smelled by others. Starts empty in every world (it's grown by
     // play, not seeded), and is restored from a save on load.
@@ -103,6 +115,12 @@ export class World {
     // never perturbs the main simulation stream.
     this.terrainSeed = (this.rng() * 0x100000000) >>> 0;
     this.terrain = new Terrain(this.width, this.height, this.terrainSeed);
+
+    // Grow the microclimate from its own seed (also off the main rng, but the
+    // field's generation runs on a private internal rng, so it never perturbs
+    // the simulation stream — just like the terrain).
+    this.microclimateSeed = (this.rng() * 0x100000000) >>> 0;
+    this.microclimate = new Microclimate(this.width, this.height, this.microclimateSeed);
 
     // Seed the starting larder. Because spawnFood now turns down infertile
     // ground (and water outright), keep trying until the world is stocked to
@@ -545,6 +563,17 @@ export class World {
     // rhythm — so the HUD can show which specialism the clock currently favours
     // (a sunleaf peaking by day, a moonleaf by night) beside the standing split.
     const kindYield = [kindYieldFactor(0, this.time), kindYieldFactor(1, this.time)];
+    // Spatial climate sorting: how well the population has settled into the
+    // microclimate it prefers. For each axis, correlate every creature's local
+    // microclimate offset (warmer/cooler, wetter/drier than the global average at
+    // its spot) against its matching preference gene. A positive correlation means
+    // warm-adapted bodies have gathered in the warm regions and cold-adapted ones
+    // in the cool — the spatial niche-sorting this layer exists to produce — while
+    // ~0 means the prefs are scattered without regard to where a creature stands.
+    // Null below two creatures or when a column has no spread (correlation is
+    // undefined), so the HUD shows "—" rather than a misleading number.
+    const climateSortWarmth = this._climateSort((c) => this.microclimate.warmthOffsetAt(c.x, c.y), (c) => c.genome.warmthPref);
+    const climateSortWetness = this._climateSort((c) => this.microclimate.wetnessOffsetAt(c.x, c.y), (c) => c.genome.wetnessPref);
     return {
       population: n,
       food: this.food.length,
@@ -572,8 +601,37 @@ export class World {
       matings,
       crossMatings: cross,
       isolation,
+      climateSortWarmth,
+      climateSortWetness,
       avg,
     };
+  }
+
+  // Pearson correlation across the live population between a per-creature `xOf`
+  // (here the local microclimate offset) and `yOf` (here the matching preference
+  // gene). Returns a value in [-1, 1], or null when it's undefined — fewer than
+  // two creatures, or no spread in either column. Pure observation: it draws no
+  // rng and never feeds back into the dynamics.
+  _climateSort(xOf, yOf) {
+    const n = this.creatures.length;
+    if (n < 2) return null;
+    let sx = 0, sy = 0;
+    for (const c of this.creatures) {
+      sx += xOf(c);
+      sy += yOf(c);
+    }
+    const mx = sx / n;
+    const my = sy / n;
+    let cov = 0, vx = 0, vy = 0;
+    for (const c of this.creatures) {
+      const dx = xOf(c) - mx;
+      const dy = yOf(c) - my;
+      cov += dx * dy;
+      vx += dx * dx;
+      vy += dy * dy;
+    }
+    if (vx <= 0 || vy <= 0) return null;
+    return cov / Math.sqrt(vx * vy);
   }
 
   // A plain, JSON-safe snapshot of the whole world: the running counters, the
@@ -593,6 +651,7 @@ export class World {
       peakPopulation: this.peakPopulation,
       foodSpawnAccumulator: this.foodSpawnAccumulator,
       terrainSeed: this.terrainSeed,
+      microclimateSeed: this.microclimateSeed,
       rngState: this.rng.getState(),
       food: this.food.filter((f) => !f.dead).map((f) => [f.x, f.y, f.kind]),
       creatures: this.creatures.filter((c) => c.alive).map((c) => c.serialize()),
@@ -621,6 +680,10 @@ export class World {
     // stored — the seed reproduces it bit-for-bit).
     world.terrainSeed = data.terrainSeed >>> 0;
     world.terrain = new Terrain(world.width, world.height, world.terrainSeed);
+
+    // Regrow the microclimate from its saved seed, exactly like the terrain.
+    world.microclimateSeed = data.microclimateSeed >>> 0;
+    world.microclimate = new Microclimate(world.width, world.height, world.microclimateSeed);
 
     world.food = data.food.map(([x, y, kind]) => ({ x, y, kind: kind === 1 ? 1 : 0 }));
     world.scent = ScentField.deserialize(data.scent, world.width, world.height);

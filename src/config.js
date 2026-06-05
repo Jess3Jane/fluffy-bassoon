@@ -237,6 +237,27 @@ export const CONFIG = {
     windFoodDrift: 18, // how fast a full gale drifts loose food downwind (units/sec)
   },
 
+  // Microclimate: a *spatial* axis for the climate, layered under the global
+  // season/weather clock. Where season and weather move the whole map up and
+  // down the warmth/wetness axes together over time, the microclimate is a
+  // static, per-region offset — a sun-baked, dry south and a cool, damp north,
+  // say — grown once from a seed with the same wrapping value-noise as the
+  // terrain (so it tiles seamlessly and reproduces bit-for-bit from the seed,
+  // never needing to be stored). The warmth/wetness a creature actually feels
+  // (and so its `climateStress`) is the global level *plus* the offset at its
+  // position, clamped back onto [0, 1]. So `warmthPref` / `wetnessPref` now
+  // partition creatures across *space* as well as time: a warm-adapted clade
+  // settles the south while a cold-adapted one holds the north, even at the same
+  // instant. A coarse lattice (few control points) makes broad regional patches
+  // rather than fine speckle; the amplitudes set how strong the regional pull is
+  // relative to the seasonal swing.
+  microclimate: {
+    latticeCols: 3, // control-point grid for the offset noise (wraps toroidally)
+    latticeRows: 3,
+    warmthAmplitude: 0.4, // peak warmth offset (±) a region adds to the season
+    wetnessAmplitude: 0.35, // peak wetness offset (±) a region adds to the weather
+  },
+
   // Scent / pheromone plumes: a drifting chemical field laid down by living
   // creatures that turns the prevailing wind into an information channel. A
   // feeding creature drops a "food here" plume; a creature killed drops a strong

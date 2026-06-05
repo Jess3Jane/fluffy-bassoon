@@ -111,16 +111,18 @@ export class Terrain {
   }
 }
 
-// Build a wrapping lattice of random values in [0, 1) for value noise.
-function noiseField(rng, cols, rows) {
+// Build a wrapping lattice of random values in [0, 1) for value noise. Exported
+// so the microclimate field can reuse the same seamless-noise machinery.
+export function noiseField(rng, cols, rows) {
   const v = new Float64Array(cols * rows);
   for (let i = 0; i < v.length; i++) v[i] = rng();
   return { cols, rows, v };
 }
 
 // Sample a noise field at (u, v) in [0, 1) with smoothstep'd bilinear
-// interpolation, wrapping the lattice so the result tiles seamlessly.
-function sampleField(field, u, v) {
+// interpolation, wrapping the lattice so the result tiles seamlessly. Exported
+// alongside `noiseField` for the microclimate field.
+export function sampleField(field, u, v) {
   const { cols, rows, v: data } = field;
   const fx = u * cols;
   const fy = v * rows;

@@ -117,6 +117,7 @@ function updateHud() {
     row("Avg hunt", s.avg.hunt.toFixed(2)),
     row("Warmth pref", s.avg.warmthPref.toFixed(2)),
     row("Wetness pref", s.avg.wetnessPref.toFixed(2)),
+    row("Climate sort", climateSortRow(s)),
     divider(),
     row("Food voice", s.avg.foodVoice.toFixed(2)),
     row("Alarm voice", s.avg.alarmVoice.toFixed(2)),
@@ -148,6 +149,17 @@ function formatTime(sec) {
 function isolationRow(isolation) {
   if (isolation == null) return "—";
   return `${Math.round(isolation * 100)}%`;
+}
+
+// Spatial climate sorting: the correlation between where a creature stands in
+// the microclimate (warmer/cooler, wetter/drier than average) and the climate it
+// prefers, one figure per axis. Positive means clades have settled into the
+// regions that suit them — warm-adapted in the warm south, cold-adapted in the
+// cool north — so the figures climb as the population sorts itself across space.
+// "—" until there are enough creatures with some spread to define it.
+function climateSortRow(s) {
+  const fmt = (v) => (v == null ? "—" : v.toFixed(2));
+  return `w ${fmt(s.climateSortWarmth)} / ${fmt(s.climateSortWetness)}`;
 }
 
 // The wind reads as "Calm" until a storm actually stirs one up; once it blows,
