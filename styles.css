@@ -384,3 +384,18 @@ button:disabled:hover { background: rgba(111, 211, 199, 0.12); }
   height: 100%;
   border-radius: 4px;
 }
+
+/* Click-through links: full-width buttons that hop to a related creature. */
+#inspector-links {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+#inspector-links .ilink {
+  width: 100%;
+  text-align: left;
+  font-size: 11.5px;
+  padding: 4px 9px;
+}

@@ -31,6 +31,12 @@ export class Creature {
     this.lineageHue = genome.lineageHue; // neutral clade colour
     this.alive = true;
     this.generation = 0;
+    // The id of the creature this one is currently steering toward (its prey), or
+    // null when it's heading for food / wandering. A transient, view-only
+    // annotation refreshed every `update` for the inspector's click-through
+    // "target" link — it's never serialized and draws no rng, so it changes
+    // nothing about the simulation or its save format.
+    this.targetId = null;
   }
 
   static random(world, rng) {
@@ -137,6 +143,11 @@ export class Creature {
     let target = null;
     if (prey && plant) target = g.diet >= 0.5 ? prey : plant;
     else target = prey || plant;
+
+    // Remember the target when it's another creature (the prey it's hunting), so
+    // the inspector can offer a click-through link to it. Food isn't an
+    // inspectable creature, so steering toward a plant (or nothing) records null.
+    this.targetId = target === prey && prey ? prey.id : null;
 
     // --- Decide heading. ---
     let desired = this.heading;
