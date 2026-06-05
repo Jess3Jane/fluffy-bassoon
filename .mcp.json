@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "webview": {
+      "command": "npx",
+      "args": [
+        "--yes",
+        "@playwright/mcp",
+        "--headless",
+        "--no-sandbox",
+        "--isolated",
+        "--executable-path",
+        "/opt/claude-webview/chrome"
+      ]
+    }
+  }
+}

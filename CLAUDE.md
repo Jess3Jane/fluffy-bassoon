@@ -15,6 +15,8 @@ Once every 25 iterations a screenshot will be added to `checkpoints`. This is a 
 evolved game state. It is provided solely to give feedback on what the project looks like running in a
 browser and how the world state evolves long term.
 
+There is a chrome webview helper skill `web-ui-review` which you can use to validate ui changes.
+
 ## The stack
 
 The application must run in a web browser and be deployed via Github pages.
