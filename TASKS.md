@@ -1300,16 +1300,65 @@ population dynamics, natural selection, and surprising behaviour.
       replay); the existing `canopy*.test.mjs` curve/recovery/sort assertions and the
       five version-assert tests (bumped 12 → 13) all still hold.
 
+- [x] **UI/UX: smooth zoom easing** (follow-up (e) to the inspector/camera — the
+      last of the camera polish). Wheel notches and the on-screen / keyboard +/−
+      buttons used to *snap* the zoom to its new level in a single frame, which
+      reads as a jerk on a fast scroll and makes it hard to land on a comfortable
+      magnification; now the zoom **eases** toward its target over a few frames, so
+      a scroll glides in and out and repeated notches compound into one smooth
+      motion. The whole thing is a clean extension of the existing focus-zoom: the
+      `Camera` already knew how to set an absolute zoom while pinning the world
+      point under a screen pixel (the "zoom toward the cursor" maths), so that body
+      was lifted into a private `_zoomToward(targetZoom, sx, sy, …)` and now backs
+      both paths. The camera holds a `zoomTarget` (the level it's easing toward) and
+      a recorded focus pixel; `requestZoom(factor, sx, sy)` *only* moves the target
+      and stores the focus (so N wheel events in a frame accumulate into one target
+      rather than fighting), and a per-frame `tickZoom(dt, …)` — driven from the
+      main loop with the real elapsed seconds, so it's frame-rate independent —
+      walks the live `zoom` toward the target by a `1 − e^(−rate·dt)` blend applied
+      **geometrically (in log-zoom)**, so the perceived rate is even across the
+      whole 1–12× range instead of crawling near the floor and racing near the cap.
+      The focus pixel is re-pinned every eased frame, so the world point under the
+      cursor stays put for the *entire* glide, not just the endpoints. Three details
+      keep it robust: within `zoomSnap` of the target the zoom **lands exactly** and
+      the animation stops touching the centre (so a settled idle tick is a true
+      no-op — and, crucially, leaves the per-frame `centerOn` from *follow mode* the
+      last word on the centre, the reason `tickZoom` is sequenced *before* the
+      follow re-centre in the loop); the immediate `zoomAt` used for **pinch**
+      (kept snappy 1:1 for direct manipulation) now snaps `zoomTarget` to its result
+      in lock-step, so a later tick never drags a pinch-set zoom back toward a stale
+      target; and `reset` returns the target to 1 with the zoom. `ensureFollowZoom`
+      and the wheel/button/key handlers all route through `requestZoom`, so every
+      zoom entry point eases except the deliberately-immediate pinch. Purely a
+      *view* feature — no rng, no serialized state, no simulation touch (no
+      `SAVE_VERSION` bump), so the headless suite stays green. `test/camera.test.mjs`
+      gains coverage of the new core: a request moving only the target (and notches
+      compounding into it), `tickZoom` easing the live zoom monotonically upward
+      without overshoot and landing *exactly* on the target (then idling as a no-op
+      that doesn't disturb the centre), the focus world-point staying pinned across
+      the whole glide, an eased request clamping at the zoom ceiling with no
+      overshoot, an immediate `zoomAt` keeping the target in lock-step (so a
+      following tick holds rather than drifts), and `reset` clearing the target. The
+      DOM input wiring (wheel/pointer/keyboard/buttons) needs a browser, so — like
+      the rest of the camera input — it was checked there: a single wheel notch on a
+      paused world changed the rendered view across 22 of 30 frames (a snap would
+      change one frame then hold) and settled cleanly, confirming the glide
+      integrates end-to-end with no console errors.
+
 ## Next up
 
-- [ ] **UI/UX, continued.** Six passes have landed — a *creature inspector*, a
-      *pan/zoom camera*, *collapsible stat groups*, a *follow-selected camera
-      mode*, an *in-app legend*, and now *click-through inspector links* (all
-      below); remaining follow-up: (e) **smooth zoom inertia** — the remaining
-      pinch/zoom polish now that *follow-selected* (keep the inspected creature
-      centred as it moves) and the click-through links (which *select-and-follow*
-      a related creature in one hop) have landed; eased wheel/button zoom would
-      round out the camera feel.
+- [ ] **UI/UX, continued.** Seven passes have now landed — a *creature inspector*,
+      a *pan/zoom camera*, *collapsible stat groups*, a *follow-selected camera
+      mode*, an *in-app legend*, *click-through inspector links*, and now *smooth
+      zoom easing* (all below). The camera follow-ups (b) through (e) are done; the
+      camera feel is rounded out. Open directions for the next UI pass, if picked:
+      a *minimap* / world-overview thumbnail (the zoomed-in view loses the global
+      picture — a corner minimap showing the whole world with the current viewport
+      rectangle would let you navigate a large world without zooming out), a
+      *creature trail* (trace the inspected individual's recent path so its
+      foraging/fleeing behaviour reads over time, not just its instantaneous
+      heading), or a *time-series scrubber* / pause-and-step controls (single-step
+      the fixed timestep to study a moment frame by frame).
 - [ ] **Widen the realised canopy sort further — explicit metapopulation structure.**
       The kin-structured pass below lifted the *mean* realised sort modestly (~+25%)
       and stabilised the world, but per-seed the sort is still swamped by terrain
