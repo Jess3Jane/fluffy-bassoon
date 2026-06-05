@@ -8,6 +8,7 @@ import { weatherNoise, windStrength, windDirection } from "./weather.js";
 import { TILE } from "./terrain.js";
 import { SCENT } from "./scent.js";
 import { TILE_COLORS, FOOD_COLORS } from "./palette.js";
+import { trailSegments } from "./trail.js";
 
 // How many cells across to sample the microclimate wash. Coarse — the field is
 // broad regional patches, not fine detail — so the overlay stays cheap.
@@ -33,6 +34,10 @@ export class Renderer {
     // ring and its sense radius so the inspected individual is easy to follow as
     // it moves; set by `main.js` and cleared when the creature dies.
     this.selected = null;
+    // The recent path of the selected creature (a `Trail`), or null. Drawn as a
+    // fading polyline under the bodies so the inspected individual's track over
+    // time is visible; set by `main.js` alongside `selected`.
+    this.trail = null;
     this.resize();
     window.addEventListener("resize", () => this.resize());
   }
@@ -124,6 +129,13 @@ export class Renderer {
       }
     }
     ctx.globalAlpha = 1;
+
+    // Inspector trail: the selected creature's recent path, drawn under the
+    // bodies so the track reads behind the live crowd. Only while a selection is
+    // actually alive — a vanished selection clears its highlight too.
+    if (this.selected && this.selected.alive && this.trail) {
+      this.drawTrail(ctx, this.trail, world.width, world.height);
+    }
 
     // Creatures.
     for (const c of world.creatures) {
@@ -291,6 +303,38 @@ export class Renderer {
     ctx.beginPath();
     ctx.arc(c.x, c.y, c.radius + 3 / this.scale + 2, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.restore();
+  }
+
+  // Trace the selected creature's recent path as a fading polyline: the oldest
+  // points are faint and the freshest near the body are brightest, so the
+  // direction of travel reads as a comet-like tail. The path is split into
+  // separate strokes wherever it crosses the toroidal seam (`trailSegments`), so
+  // a wrap doesn't streak a false line across the whole view. Purely a view of
+  // the `Trail` `main.js` feeds it — it holds no state of its own.
+  drawTrail(ctx, trail, width, height) {
+    const pts = trail.points;
+    if (pts.length < 2) return;
+    const last = pts.length - 1;
+    ctx.save();
+    ctx.lineWidth = 1.5 / this.scale;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    // Draw each polyline (split at the seam) one sub-segment at a time, fading by
+    // the segment's position in the full ring — tail near-transparent, head near
+    // the body brightest — so the path reads as a comet tail pointing where the
+    // creature came from. The seam split keeps a wrap from streaking a false line.
+    for (const seg of trailSegments(pts, width, height)) {
+      const base = pts.indexOf(seg[0]); // age offset of this run within the ring
+      for (let i = 1; i < seg.length; i++) {
+        const age = (base + i) / last; // 0 oldest … 1 freshest
+        ctx.strokeStyle = `rgba(255, 255, 255, ${(0.05 + age * 0.4).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.moveTo(seg[i - 1].x, seg[i - 1].y);
+        ctx.lineTo(seg[i].x, seg[i].y);
+        ctx.stroke();
+      }
+    }
     ctx.restore();
   }
 

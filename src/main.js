@@ -12,6 +12,7 @@ import { History } from "./history.js";
 import { Charts } from "./charts.js";
 import { saveWorld, loadWorld, hasSavedWorld } from "./persistence.js";
 import { ToolController, TOOLS, TOOL_LABELS } from "./tools.js";
+import { Trail } from "./trail.js";
 import { renderLegend } from "./legend.js";
 import { phaseLabel } from "./daycycle.js";
 import { kindLabel } from "./plants.js";
@@ -42,6 +43,12 @@ let selectedId = null;
 // moves (the inspector's "Follow" toggle). Only meaningful while something is
 // selected; reset on every selection change and released if the creature dies.
 let follow = false;
+
+// The recent path of the inspected creature, recorded each frame and drawn as a
+// fading trail. Reset whenever the selection changes (in `select`), so a new
+// creature never inherits the previous one's track.
+const trail = new Trail(CONFIG.trail.maxPoints, CONFIG.trail.minDist);
+renderer.trail = trail;
 
 // Adopt a freshly built or restored world: swap it in, start a clean chart
 // history, and reset the loop's timing so we don't fast-forward the new world.
@@ -94,6 +101,13 @@ function loop(now) {
   const selected = resolveSelection();
   if (selected == null) selectedId = null;
   renderer.selected = selected;
+
+  // Extend the inspected creature's path trail (it's cleared on every selection
+  // change, so this only ever accumulates the current creature's track). Skip
+  // while paused so a paused world doesn't lay a stack of coincident points.
+  if (selected && !paused) {
+    trail.record(selected.x, selected.y, world.width, world.height);
+  }
 
   // Ease any pending wheel/button/key zoom toward its target this frame, before
   // follow re-centres — so follow keeps the last word on the centre.
@@ -354,6 +368,9 @@ function updateLinks(creature) {
 function select(creature) {
   selectedId = creature ? creature.id : null;
   renderer.selected = creature ?? null;
+  // Start the path trail fresh so the new selection never shows the previous
+  // creature's track (and a deselect leaves nothing to draw).
+  trail.clear();
   setFollow(false);
   updateInspector(creature ?? null);
 }

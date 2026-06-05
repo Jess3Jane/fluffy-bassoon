@@ -537,6 +537,18 @@ export const CONFIG = {
     cellSize: 70,
   },
 
+  // Inspector path trail: the recent track of the selected creature, recorded
+  // as a bounded ring of points and drawn as a fading polyline so its foraging /
+  // fleeing path reads over time, not just from its instantaneous heading arrow.
+  // Purely a view aid — no simulation state, never serialized. A point is laid
+  // every `minDist` world-units of travel and the ring holds `maxPoints`, so the
+  // trail spans the last ~`minDist · maxPoints` units of ground covered (≈640),
+  // the same distance at any playback speed.
+  trail: {
+    maxPoints: 160,
+    minDist: 4,
+  },
+
   // Mutation applied to each genome gene at birth.
   mutation: {
     rate: 0.9, // probability a child mutates at all

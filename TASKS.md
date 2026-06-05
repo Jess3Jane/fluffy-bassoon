@@ -1345,20 +1345,50 @@ population dynamics, natural selection, and surprising behaviour.
       change one frame then hold) and settled cleanly, confirming the glide
       integrates end-to-end with no console errors.
 
+- [x] Creature trail — the inspected individual's recent path traced behind it,
+      so its foraging/fleeing behaviour reads *over time* and not only from the
+      instantaneous heading arrow. A small view-only module (`src/trail.js`,
+      `Trail`) keeps a bounded ring of recent positions: `main.js` feeds it the
+      live selection's position each rendered frame (skipped while paused, so a
+      paused world doesn't pile coincident points), and `select` clears it on
+      every selection change so a new creature never inherits the old track. A
+      point is only laid once the creature has travelled at least
+      `CONFIG.trail.minDist` (4 units) from the last kept one — measured on the
+      torus via the shared `wrapDelta`, so a step across the seam counts as the
+      short hop it is — and the ring holds `CONFIG.trail.maxPoints` (160), so the
+      trail spans the last ~640 units of *ground covered* regardless of playback
+      speed or frame rate (a fast flick and a slow crawl read the same length).
+      The renderer draws it under the bodies as a fading comet tail: a pure
+      `trailSegments(points, w, h)` splits the wrapped path into polylines,
+      breaking wherever two consecutive points jump more than half the world on
+      either axis (a toroidal seam crossing) so a wrap doesn't streak a false
+      line straight across the view, and each sub-segment is stroked with an
+      alpha rising from the faint tail to the bright head. Purely a *view*
+      feature — no rng, no simulation touch, nothing serialized (no
+      `SAVE_VERSION` bump), so the headless suite stays green. `test/trail.test.mjs`
+      covers the ring (first point always kept, sub-`minDist` steps gated against
+      the last *kept* point, the `maxPoints` cap evicting oldest-first, the
+      toroidal-`minDist` seam-short gate, `clear`) and `trailSegments` (a
+      contiguous path as one polyline, a horizontal and a vertical seam split,
+      lone single-point runs dropped, and the empty/one-point no-op). Verified in
+      the browser: following a selected creature traces a clean fading path that
+      reads its graze loops and wrap-arounds, no console errors.
+
 ## Next up
 
-- [ ] **UI/UX, continued.** Seven passes have now landed — a *creature inspector*,
+- [ ] **UI/UX, continued.** Eight passes have now landed — a *creature inspector*,
       a *pan/zoom camera*, *collapsible stat groups*, a *follow-selected camera
-      mode*, an *in-app legend*, *click-through inspector links*, and now *smooth
-      zoom easing* (all below). The camera follow-ups (b) through (e) are done; the
-      camera feel is rounded out. Open directions for the next UI pass, if picked:
-      a *minimap* / world-overview thumbnail (the zoomed-in view loses the global
-      picture — a corner minimap showing the whole world with the current viewport
-      rectangle would let you navigate a large world without zooming out), a
-      *creature trail* (trace the inspected individual's recent path so its
-      foraging/fleeing behaviour reads over time, not just its instantaneous
-      heading), or a *time-series scrubber* / pause-and-step controls (single-step
-      the fixed timestep to study a moment frame by frame).
+      mode*, an *in-app legend*, *click-through inspector links*, *smooth zoom
+      easing*, and now a *creature trail* (all below). The camera follow-ups (b)
+      through (e) are done; the camera feel is rounded out, and the trail now
+      traces the inspected individual's path over time. Open directions for the
+      next UI pass, if picked: a *minimap* / world-overview thumbnail (the
+      zoomed-in view loses the global picture — a corner minimap showing the whole
+      world with the current viewport rectangle would let you navigate a large
+      world without zooming out — and it would pair naturally with the new trail,
+      plotting the selected creature's track on the overview too), or a
+      *time-series scrubber* / pause-and-step controls (single-step the fixed
+      timestep to study a moment frame by frame).
 - [ ] **Widen the realised canopy sort further — explicit metapopulation structure.**
       The kin-structured pass below lifted the *mean* realised sort modestly (~+25%)
       and stabilised the world, but per-seed the sort is still swamped by terrain
