@@ -106,62 +106,127 @@ function drawCharts() {
 const statsEl = document.getElementById("stats");
 let hudThrottle = 0;
 
+// The HUD layout, declared as collapsible groups so the ~35 stat rows fold into
+// labelled <details> sections instead of one flat wall (mirroring how the
+// inspector groups the genome). Each row is a [label, read] pair, `read` taking
+// the live `world.stats()` snapshot and returning the formatted value text.
+//
+// Why declarative rather than rebuilding innerHTML each tick: `updateHud` runs
+// ~6×/sec, and a fresh innerHTML would reset every <details> back to its default
+// open/closed state on each refresh — collapsing a group would last a sixth of a
+// second. So the skeleton DOM is built once (`buildHud`) and each refresh only
+// rewrites the value spans (`updateHud`), which both preserves the open/closed
+// state a viewer sets and avoids reflowing the whole panel every tick.
+const HUD_GROUPS = [
+  {
+    name: "Population",
+    open: true,
+    rows: [
+      ["Population", (s) => s.population],
+      ["Peak", (s) => s.peak],
+      ["Species", (s) => s.species],
+      ["Eco species", (s) => (s.geneSpecies == null ? "—" : s.geneSpecies)],
+      ["Isolation", (s) => isolationRow(s.isolation)],
+      ["Carnivores", (s) => s.carnivores],
+      ["Top gen", (s) => s.generation],
+      ["Avg energy", (s) => s.avgEnergy.toFixed(0)],
+      ["Kills", (s) => s.kills],
+    ],
+  },
+  {
+    name: "World & climate",
+    open: true,
+    rows: [
+      ["Food", (s) => `${s.food} (${s.foodByKind[0]}/${s.foodByKind[1]})`],
+      [
+        "Plant yield",
+        (s) =>
+          `${kindLabel(0)} ${Math.round(s.kindYield[0] * 100)}% / ${kindLabel(1)} ${Math.round(s.kindYield[1] * 100)}%`,
+      ],
+      ["Scent", (s) => s.scent],
+      ["Time", (s) => formatTime(s.time)],
+      ["Daylight", (s) => `${phaseLabel(s.time)} ${Math.round(s.daylight * 100)}%`],
+      ["Season", (s) => seasonLabel(s.time)],
+      ["Weather", (s) => `${weatherLabel(s.time)} ${Math.round(s.climateFood * 100)}%`],
+      ["Wind", (s) => windRow(s.time)],
+    ],
+  },
+  {
+    name: "Traits & niche",
+    open: false,
+    rows: [
+      ["Avg speed", (s) => s.avg.speed.toFixed(1)],
+      ["Avg sense", (s) => s.avg.sense.toFixed(0)],
+      ["Avg size", (s) => s.avg.size.toFixed(2)],
+      ["Avg wander", (s) => s.avg.wander.toFixed(2)],
+      ["Avg diet", (s) => s.avg.diet.toFixed(2)],
+      ["Avg forage", (s) => s.avg.forage.toFixed(2)],
+      ["Avg hunt", (s) => s.avg.hunt.toFixed(2)],
+      ["Warmth pref", (s) => s.avg.warmthPref.toFixed(2)],
+      ["Wetness pref", (s) => s.avg.wetnessPref.toFixed(2)],
+      ["Climate sort", (s) => climateSortRow(s)],
+      ["Biome", (s) => (s.biomeSort == null ? "—" : s.biomeSort.toFixed(2))],
+      ["Canopy", (s) => (s.canopy == null ? "—" : s.canopy.toFixed(2))],
+      ["Canopy sort", (s) => canopySortRow(s)],
+    ],
+  },
+  {
+    name: "Social",
+    open: false,
+    rows: [
+      ["Food voice", (s) => s.avg.foodVoice.toFixed(2)],
+      ["Alarm voice", (s) => s.avg.alarmVoice.toFixed(2)],
+      ["Food trust", (s) => s.avg.foodTrust.toFixed(2)],
+      ["Alarm trust", (s) => s.avg.alarmTrust.toFixed(2)],
+      ["Kinship", (s) => s.avg.kinship.toFixed(2)],
+      ["Mating", (s) => s.avg.mating.toFixed(2)],
+      ["Mate choice", (s) => s.avg.mateChoice.toFixed(2)],
+    ],
+  },
+];
+
+// The value spans to refresh, paired with their `read` function. Filled by
+// `buildHud`; `updateHud` walks it to rewrite only the text.
+let hudCells = [];
+
+// Build the HUD skeleton once: a <details> group per section, each holding its
+// rows, with every value span collected into `hudCells` so refreshes touch only
+// text. Safe to call again (e.g. on a hot reload) — it clears first.
+function buildHud() {
+  statsEl.textContent = "";
+  hudCells = [];
+  for (const group of HUD_GROUPS) {
+    const details = document.createElement("details");
+    details.className = "group";
+    details.open = group.open;
+    const summary = document.createElement("summary");
+    summary.textContent = group.name;
+    details.appendChild(summary);
+    for (const [label, read] of group.rows) {
+      const rowEl = document.createElement("div");
+      rowEl.className = "row";
+      const labelEl = document.createElement("span");
+      labelEl.className = "label";
+      labelEl.textContent = label;
+      const valueEl = document.createElement("span");
+      valueEl.className = "value";
+      rowEl.append(labelEl, valueEl);
+      details.appendChild(rowEl);
+      hudCells.push([valueEl, read]);
+    }
+    statsEl.appendChild(details);
+  }
+}
+
 function updateHud() {
   hudThrottle++;
   if (hudThrottle % 10 !== 0) return; // ~6 updates/sec
   const s = world.stats();
-  statsEl.innerHTML = [
-    row("Population", s.population),
-    row("Peak", s.peak),
-    row("Species", s.species),
-    row("Eco species", s.geneSpecies == null ? "—" : s.geneSpecies),
-    row("Isolation", isolationRow(s.isolation)),
-    row("Carnivores", s.carnivores),
-    row("Food", `${s.food} (${s.foodByKind[0]}/${s.foodByKind[1]})`),
-    row(
-      "Plant yield",
-      `${kindLabel(0)} ${Math.round(s.kindYield[0] * 100)}% / ${kindLabel(1)} ${Math.round(s.kindYield[1] * 100)}%`,
-    ),
-    row("Scent", s.scent),
-    row("Top gen", s.generation),
-    row("Time", formatTime(s.time)),
-    row("Daylight", `${phaseLabel(s.time)} ${Math.round(s.daylight * 100)}%`),
-    row("Season", seasonLabel(s.time)),
-    row("Weather", `${weatherLabel(s.time)} ${Math.round(s.climateFood * 100)}%`),
-    row("Wind", windRow(s.time)),
-    row("Avg energy", s.avgEnergy.toFixed(0)),
-    row("Kills", s.kills),
-    divider(),
-    row("Avg speed", s.avg.speed.toFixed(1)),
-    row("Avg sense", s.avg.sense.toFixed(0)),
-    row("Avg size", s.avg.size.toFixed(2)),
-    row("Avg wander", s.avg.wander.toFixed(2)),
-    row("Avg diet", s.avg.diet.toFixed(2)),
-    row("Avg forage", s.avg.forage.toFixed(2)),
-    row("Avg hunt", s.avg.hunt.toFixed(2)),
-    row("Warmth pref", s.avg.warmthPref.toFixed(2)),
-    row("Wetness pref", s.avg.wetnessPref.toFixed(2)),
-    row("Climate sort", climateSortRow(s)),
-    row("Biome", s.biomeSort == null ? "—" : s.biomeSort.toFixed(2)),
-    row("Canopy", s.canopy == null ? "—" : s.canopy.toFixed(2)),
-    row("Canopy sort", canopySortRow(s)),
-    divider(),
-    row("Food voice", s.avg.foodVoice.toFixed(2)),
-    row("Alarm voice", s.avg.alarmVoice.toFixed(2)),
-    row("Food trust", s.avg.foodTrust.toFixed(2)),
-    row("Alarm trust", s.avg.alarmTrust.toFixed(2)),
-    row("Kinship", s.avg.kinship.toFixed(2)),
-    row("Mating", s.avg.mating.toFixed(2)),
-    row("Mate choice", s.avg.mateChoice.toFixed(2)),
-  ].join("");
+  for (const [el, read] of hudCells) el.textContent = read(s);
 }
 
 function row(label, value) {
   return `<div class="row"><span class="label">${label}</span><span class="value">${value}</span></div>`;
-}
-
-function divider() {
-  return `<div class="row" style="opacity:.3">—————————</div>`;
 }
 
 function formatTime(sec) {
@@ -462,5 +527,6 @@ document.getElementById("zoom-reset").addEventListener("click", () => camera.res
 
 // --- Boot ---
 
+buildHud();
 reset();
 requestAnimationFrame(loop);

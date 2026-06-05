@@ -64,6 +64,42 @@ html, body {
 #stats .label { color: var(--muted); }
 #stats .value { color: var(--text); }
 
+/* Collapsible stat groups: each <details> folds a labelled section so the panel
+   reads as a handful of groups rather than one flat wall of rows. */
+#stats .group {
+  border-top: 1px solid rgba(111, 211, 199, 0.1);
+  padding: 1px 0;
+}
+
+#stats .group:first-child { border-top: none; }
+
+#stats summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--accent);
+  opacity: 0.8;
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 4px 0 2px;
+}
+
+/* Hide the default disclosure marker (here and in the spec's standard form) for
+   a custom triangle that matches the mono theme. */
+#stats summary::-webkit-details-marker { display: none; }
+
+#stats summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 1em;
+  color: var(--muted);
+  transition: transform 0.12s ease;
+}
+
+#stats .group[open] > summary::before { transform: rotate(90deg); }
+
+#stats summary:hover { opacity: 1; }
+
 #charts {
   display: block;
   width: 100%;
