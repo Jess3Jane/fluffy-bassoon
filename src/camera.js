@@ -19,6 +19,14 @@ export const CAMERA = {
   // to this zoom so the tracked creature is actually large enough to watch (at
   // zoom 1 the whole world fits and centring on one creature is a no-op).
   followZoom: 5,
+  // Smooth-zoom easing: rather than snapping zoom to its new value, the actual
+  // zoom eases toward a *target* each frame, so wheel notches and +/- presses
+  // glide instead of jumping. `zoomEase` is the exponential rate per second (a
+  // frame-rate-independent 1 − e^(−rate·dt) blend, ~70ms time constant), and a
+  // zoom within `zoomSnap` (a fraction) of the target lands exactly to stop the
+  // animation cleanly.
+  zoomEase: 14,
+  zoomSnap: 0.004,
 };
 
 function clamp(v, lo, hi) {
@@ -42,10 +50,18 @@ export class Camera {
     // resolved lazily so the camera needs no world dimensions to construct.
     this.cx = null;
     this.cy = null;
+    // Smooth-zoom state: the zoom the camera is easing *toward*, and the screen
+    // pixel to keep pinned while it eases (the cursor for a wheel zoom, the
+    // viewport centre for a button/key zoom). `zoom` follows `zoomTarget` a step
+    // per `tickZoom`; an immediate `zoomAt` keeps them in lock-step.
+    this.zoomTarget = 1;
+    this.zoomFocusX = 0;
+    this.zoomFocusY = 0;
   }
 
   reset() {
     this.zoom = 1;
+    this.zoomTarget = 1;
     this.cx = null;
     this.cy = null;
   }
@@ -76,20 +92,69 @@ export class Camera {
     };
   }
 
-  // Zoom by `factor` while keeping the world point under the screen position
-  // (sx, sy) pinned there — the natural "zoom toward the cursor / pinch focus"
-  // behaviour. Clamps zoom first, so a focus zoom against the rails just stops
-  // rather than drifting the centre.
-  zoomAt(factor, sx, sy, worldW, worldH, viewW, viewH) {
+  // Set the zoom to an absolute level (clamped) while keeping the world point
+  // under the screen pixel (sx, sy) pinned there — the shared core of both the
+  // immediate `zoomAt` and the eased `tickZoom`. Clamps zoom first, so a zoom
+  // against the rails just stops rather than drifting the centre.
+  _zoomToward(targetZoom, sx, sy, worldW, worldH, viewW, viewH) {
     const before = this.view(worldW, worldH, viewW, viewH);
     const wx = (sx - before.offsetX) / before.scale;
     const wy = (sy - before.offsetY) / before.scale;
-    this.zoom = clamp(this.zoom * factor, CAMERA.minZoom, CAMERA.maxZoom);
+    this.zoom = clamp(targetZoom, CAMERA.minZoom, CAMERA.maxZoom);
     const scale = this.fitScale(worldW, worldH, viewW, viewH) * this.zoom;
     // Place the centre so (wx, wy) maps back onto (sx, sy) at the new scale.
     this.cx = wx + (viewW / 2 - sx) / scale;
     this.cy = wy + (viewH / 2 - sy) / scale;
     return this.view(worldW, worldH, viewW, viewH); // re-clamp the centre
+  }
+
+  // Zoom by `factor` *immediately* while keeping the world point under (sx, sy)
+  // pinned — the natural "zoom toward the cursor / pinch focus" behaviour, used
+  // for direct-manipulation pinch where 1:1 response beats easing. Snaps the
+  // ease target to the result, so a later `tickZoom` doesn't drag the zoom back.
+  zoomAt(factor, sx, sy, worldW, worldH, viewW, viewH) {
+    const v = this._zoomToward(this.zoom * factor, sx, sy, worldW, worldH, viewW, viewH);
+    this.zoomTarget = this.zoom;
+    return v;
+  }
+
+  // Request an eased zoom by `factor` about the screen pixel (sx, sy): it only
+  // moves the *target* (so repeated wheel notches compound into one smooth
+  // glide) and records the focus pixel; `tickZoom` walks the live zoom toward it.
+  requestZoom(factor, sx, sy) {
+    this.zoom = clamp(this.zoom, CAMERA.minZoom, CAMERA.maxZoom);
+    const base = this.zoomTarget ?? this.zoom;
+    this.zoomTarget = clamp(base * factor, CAMERA.minZoom, CAMERA.maxZoom);
+    this.zoomFocusX = sx;
+    this.zoomFocusY = sy;
+  }
+
+  // Advance the eased zoom one frame toward `zoomTarget`, keeping the recorded
+  // focus pixel pinned. A frame-rate-independent exponential blend; within
+  // `zoomSnap` of the target it lands exactly and then leaves the centre alone
+  // (so a per-frame `centerOn` from follow mode keeps the last word on it).
+  tickZoom(dt, worldW, worldH, viewW, viewH) {
+    if (this.zoomTarget == null) this.zoomTarget = this.zoom;
+    const ratio = this.zoomTarget / this.zoom;
+    if (Math.abs(ratio - 1) < CAMERA.zoomSnap) {
+      if (this.zoom !== this.zoomTarget) {
+        return this._zoomToward(
+          this.zoomTarget,
+          this.zoomFocusX,
+          this.zoomFocusY,
+          worldW,
+          worldH,
+          viewW,
+          viewH,
+        );
+      }
+      return this.view(worldW, worldH, viewW, viewH);
+    }
+    const t = 1 - Math.exp(-CAMERA.zoomEase * dt);
+    // Ease geometrically (in log-zoom), so the perceived rate is even across the
+    // whole zoom range rather than crawling near the floor and racing near the cap.
+    const next = this.zoom * Math.pow(ratio, t);
+    return this._zoomToward(next, this.zoomFocusX, this.zoomFocusY, worldW, worldH, viewW, viewH);
   }
 
   // Centre the view on a world point (the inspected creature, for "follow"),
@@ -177,7 +242,14 @@ export class CameraController {
   onWheel(e) {
     e.preventDefault();
     const factor = Math.pow(CAMERA.wheelStep, -e.deltaY);
-    this.camera.zoomAt(factor, e.clientX, e.clientY, ...this.dims());
+    // Eased: accumulate notches into the zoom target; `tickZoom` glides to it.
+    this.camera.requestZoom(factor, e.clientX, e.clientY);
+  }
+
+  // Advance the smooth zoom one frame — called from the main loop with the real
+  // elapsed seconds, so wheel/button/key zooms glide rather than snap.
+  tickZoom(dt) {
+    this.camera.tickZoom(dt, ...this.dims());
   }
 
   onDown(e) {
@@ -277,10 +349,10 @@ export class CameraController {
   }
 
   // Zoom about the viewport centre — what the on-screen +/- buttons and the
-  // keyboard +/- use (no cursor to focus on).
+  // keyboard +/- use (no cursor to focus on). Eased, like the wheel.
   zoomCentre(factor) {
-    const [worldW, worldH, viewW, viewH] = this.dims();
-    this.camera.zoomAt(factor, viewW / 2, viewH / 2, worldW, worldH, viewW, viewH);
+    const [, , viewW, viewH] = this.dims();
+    this.camera.requestZoom(factor, viewW / 2, viewH / 2);
   }
 
   // Centre the live world dimensions on (wx, wy) — the per-frame call that keeps

@@ -95,6 +95,10 @@ function loop(now) {
   if (selected == null) selectedId = null;
   renderer.selected = selected;
 
+  // Ease any pending wheel/button/key zoom toward its target this frame, before
+  // follow re-centres — so follow keeps the last word on the centre.
+  cameraControls.tickZoom(frame);
+
   // Follow mode: re-centre on the tracked creature each frame. If it has died
   // (selection resolved to null), release the camera and drop the toggle.
   if (follow) {

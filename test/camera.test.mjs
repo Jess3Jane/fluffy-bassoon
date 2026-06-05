@@ -190,6 +190,96 @@ function approx(a, b, eps = 1e-9, msg = "") {
   approx(cam.cy, H / 2, 1e-9, "zoom-1 follow pinned to world centre y");
 }
 
+// --- requestZoom only moves the target; the live zoom doesn't jump. ---
+{
+  const cam = new Camera();
+  cam.view(W, H, VW, VH);
+  cam.requestZoom(3, 320, 300);
+  approx(cam.zoom, 1, 1e-12, "live zoom is unchanged by a request");
+  approx(cam.zoomTarget, 3, 1e-12, "the target is the requested zoom");
+  // A second notch compounds into the same target rather than snapping the view.
+  cam.requestZoom(2, 320, 300);
+  approx(cam.zoom, 1, 1e-12, "live zoom still unchanged after a second request");
+  approx(cam.zoomTarget, 6, 1e-12, "notches compound into the target");
+}
+
+// --- tickZoom eases the live zoom monotonically onto the target, landing exactly. ---
+{
+  const cam = new Camera();
+  cam.view(W, H, VW, VH);
+  cam.requestZoom(4, 320, 300); // target 4×
+  const dt = 1 / 60;
+  let prev = cam.zoom;
+  let crossedHalf = false;
+  for (let i = 0; i < 5; i++) {
+    cam.tickZoom(dt, W, H, VW, VH);
+    assert.ok(cam.zoom > prev, "zoom eases upward each frame");
+    assert.ok(cam.zoom <= cam.zoomTarget + 1e-9, "never overshoots the target");
+    if (cam.zoom > 2) crossedHalf = true;
+    prev = cam.zoom;
+  }
+  assert.ok(crossedHalf, "covers real ground within a few frames");
+  // Run it out: it converges and lands exactly on the target (no perpetual crawl).
+  for (let i = 0; i < 200; i++) cam.tickZoom(dt, W, H, VW, VH);
+  approx(cam.zoom, 4, 1e-9, "eased zoom settles exactly on the target");
+  // Once settled, ticking is a no-op (and doesn't disturb the centre).
+  const cxBefore = cam.cx;
+  cam.tickZoom(dt, W, H, VW, VH);
+  approx(cam.zoom, 4, 1e-12, "a settled tick holds the zoom");
+  approx(cam.cx, cxBefore, 1e-12, "a settled tick leaves the centre alone");
+}
+
+// --- The focus pixel's world point stays pinned across the whole eased glide. ---
+{
+  const cam = new Camera();
+  const sx = 320;
+  const sy = 300; // interior focus, away from the clamping edges
+  const before = cam.view(W, H, VW, VH);
+  const wxBefore = (sx - before.offsetX) / before.scale;
+  const wyBefore = (sy - before.offsetY) / before.scale;
+  cam.requestZoom(3, sx, sy);
+  const dt = 1 / 60;
+  for (let i = 0; i < 200; i++) {
+    const t = cam.tickZoom(dt, W, H, VW, VH);
+    const wx = (sx - t.offsetX) / t.scale;
+    const wy = (sy - t.offsetY) / t.scale;
+    approx(wx, wxBefore, 1e-6, "focus world-x pinned through the glide");
+    approx(wy, wyBefore, 1e-6, "focus world-y pinned through the glide");
+  }
+}
+
+// --- An eased request clamps at the zoom ceiling. ---
+{
+  const cam = new Camera();
+  cam.view(W, H, VW, VH);
+  cam.requestZoom(1000, 320, 300);
+  approx(cam.zoomTarget, CAMERA.maxZoom, 1e-12, "request target capped at maxZoom");
+  for (let i = 0; i < 300; i++) cam.tickZoom(1 / 60, W, H, VW, VH);
+  approx(cam.zoom, CAMERA.maxZoom, 1e-9, "eased zoom lands at the cap, no overshoot");
+}
+
+// --- An immediate zoomAt keeps the ease target in lock-step (no drift-back). ---
+{
+  const cam = new Camera();
+  cam.view(W, H, VW, VH);
+  cam.zoomAt(2.5, 320, 300, W, H, VW, VH); // a direct pinch zoom
+  approx(cam.zoom, 2.5, 1e-12, "immediate zoom applies at once");
+  approx(cam.zoomTarget, 2.5, 1e-12, "the ease target snaps to the immediate result");
+  // So a following tick doesn't drag the zoom back toward a stale target.
+  cam.tickZoom(1 / 60, W, H, VW, VH);
+  approx(cam.zoom, 2.5, 1e-12, "a tick after a pinch holds the zoom");
+}
+
+// --- reset clears the ease target back to the default. ---
+{
+  const cam = new Camera();
+  cam.requestZoom(8, 320, 300);
+  cam.reset();
+  approx(cam.zoomTarget, 1, 1e-12, "reset returns the ease target to 1");
+  cam.tickZoom(1 / 60, W, H, VW, VH);
+  approx(cam.zoom, 1, 1e-12, "a tick after reset stays at the fit");
+}
+
 // --- reset returns to the default fit. ---
 {
   const cam = new Camera();
