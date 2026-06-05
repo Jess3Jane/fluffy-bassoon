@@ -8,16 +8,21 @@ import { wrapDelta } from "./math.js";
 
 // Spacing (world units) between successive dabs along a drag, per tool. Food
 // paints densely for a lush trail; creatures are spaced further apart so a
-// stroke seeds a handful rather than a solid wall of them.
-const STEP = { food: 14, creature: 26 };
+// stroke seeds a handful rather than a solid wall of them. Inspect re-picks
+// often enough to "scrub" the selection along a drag from body to body.
+const STEP = { food: 14, creature: 26, inspect: 10 };
 
 // A food dab scatters this many pellets within this radius, so a brush stroke
 // leaves an organic clump rather than a single dot.
 const FOOD_DAB_COUNT = 5;
 const FOOD_DAB_RADIUS = 22;
 
-export const TOOLS = ["food", "creature"];
-export const TOOL_LABELS = { food: "Food", creature: "Creature" };
+// Extra slack (world units) added to a creature's body radius when picking it
+// for inspection, so small bodies are still easy to land a click on.
+const INSPECT_TOLERANCE = 6;
+
+export const TOOLS = ["food", "creature", "inspect"];
+export const TOOL_LABELS = { food: "Food", creature: "Creature", inspect: "Inspect" };
 
 // Wrap a coordinate into [0, size) — strokes can run off the toroidal edges.
 function wrap(v, size) {
@@ -28,10 +33,13 @@ function wrap(v, size) {
 // callback (not a stored reference) because the world is swapped out on reset /
 // load, and the brush must always act on the live one.
 export class ToolController {
-  constructor({ canvas, renderer, getWorld }) {
+  constructor({ canvas, renderer, getWorld, onPick }) {
     this.canvas = canvas;
     this.renderer = renderer;
     this.getWorld = getWorld;
+    // Called by the inspect brush with the creature under the pointer (or null
+    // for empty ground, so a click away clears the selection).
+    this.onPick = onPick ?? (() => {});
     this.tool = "food";
     this.painting = false;
     this.lastX = 0;
@@ -101,7 +109,9 @@ export class ToolController {
   // Apply the active brush once at (x, y).
   apply(x, y) {
     const world = this.getWorld();
-    if (this.tool === "food") {
+    if (this.tool === "inspect") {
+      this.onPick(world.creatureAt(x, y, INSPECT_TOLERANCE));
+    } else if (this.tool === "food") {
       for (let i = 0; i < FOOD_DAB_COUNT; i++) {
         // Uniform scatter over a disc (sqrt keeps it from clumping centre-heavy).
         const a = world.rng() * Math.PI * 2;

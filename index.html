@@ -26,7 +26,16 @@
         <span id="speed-label">1×</span>
       </label>
     </div>
-    <p class="hint">Click or drag the world to paint — pick the <b>Tool</b> to drop food or seed creatures. Watch evolution do the rest.</p>
+    <p class="hint">Click or drag the world to paint — pick the <b>Tool</b> to drop food, seed creatures, or <b>Inspect</b> one. Watch evolution do the rest.</p>
+  </div>
+
+  <div id="inspector" hidden>
+    <div id="inspector-head">
+      <span id="inspector-swatch"></span>
+      <span id="inspector-title">Creature</span>
+      <button id="inspector-close" type="button" title="Close (Esc)">×</button>
+    </div>
+    <div id="inspector-body"></div>
   </div>
 
   <script type="module" src="src/main.js"></script>

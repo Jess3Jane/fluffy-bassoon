@@ -3,6 +3,9 @@
 import { World } from "./world.js";
 import { Renderer } from "./renderer.js";
 import { Creature } from "./creature.js";
+import { CONFIG } from "./config.js";
+import { GENES } from "./genome.js";
+import { clamp01 } from "./math.js";
 import { makeRng } from "./rng.js";
 import { History } from "./history.js";
 import { Charts } from "./charts.js";
@@ -26,6 +29,12 @@ let paused = false;
 let accumulator = 0;
 let lastTime = performance.now();
 
+// The id of the creature the inspector is focused on, or null. Held by id (not
+// by reference) so it survives the creature list reordering, and is re-resolved
+// to the live object each frame — which naturally clears the selection the
+// moment the creature dies or the world is swapped out.
+let selectedId = null;
+
 // Adopt a freshly built or restored world: swap it in, start a clean chart
 // history, and reset the loop's timing so we don't fast-forward the new world.
 function adopt(newWorld) {
@@ -33,6 +42,11 @@ function adopt(newWorld) {
   history = new History();
   accumulator = 0;
   lastTime = performance.now();
+  // A fresh or restored world has its own creatures, so any prior selection is
+  // meaningless — drop it (ids never repeat across a reset, but a loaded world
+  // could in principle reuse one, so clear explicitly rather than risk a stale
+  // match latching onto an unrelated creature).
+  select(null);
 }
 
 function reset() {
@@ -66,8 +80,16 @@ function loop(now) {
     }
   }
 
+  // Resolve the selection from its id to the live creature (or null if it has
+  // since died / left the world), and hand it to the renderer to highlight. Drop
+  // a vanished selection's id so we stop scanning for it every frame.
+  const selected = resolveSelection();
+  if (selected == null) selectedId = null;
+  renderer.selected = selected;
+
   renderer.draw(world);
   updateHud();
+  updateInspector(selected);
   drawCharts();
   requestAnimationFrame(loop);
 }
@@ -172,6 +194,144 @@ function windRow(time) {
   return `${windLabel(time)} ${Math.round(w * 100)}%`;
 }
 
+// --- Inspector ---
+//
+// A click with the Inspect tool selects the creature under the pointer; this
+// side panel then reads out that one individual's live state and full genome,
+// so the rich per-creature genetics the aggregate stats only average over
+// become tangible. The selection is held by id and re-resolved each frame.
+
+const inspectorEl = document.getElementById("inspector");
+const inspectorTitle = document.getElementById("inspector-title");
+const inspectorSwatch = document.getElementById("inspector-swatch");
+const inspectorBody = document.getElementById("inspector-body");
+
+// Set (or clear) the inspector selection. Passing a creature focuses on it;
+// passing null deselects. Updates the renderer highlight immediately so a click
+// feels responsive even between HUD refreshes.
+function select(creature) {
+  selectedId = creature ? creature.id : null;
+  renderer.selected = creature ?? null;
+  updateInspector(creature ?? null);
+}
+
+// Find the live, still-alive creature matching the current selection id, or null
+// if it has died or the world was swapped. O(n) but only while something is
+// selected, and only once per frame.
+function resolveSelection() {
+  if (selectedId == null) return null;
+  for (const c of world.creatures) {
+    if (c.id === selectedId && c.alive) return c;
+  }
+  return null;
+}
+
+// The diet gene reads as a trophic role for a quick human label, splitting the
+// herbivore↔carnivore axis at the same `carnivoreThreshold` the simulation uses
+// to decide who can hunt, with a middle "omnivore" band.
+function trophicRole(diet) {
+  const t = CONFIG.creature.carnivoreThreshold;
+  if (diet < t) return "Herbivore";
+  if (diet > 0.6) return "Carnivore";
+  return "Omnivore";
+}
+
+// Repaint the inspector for `creature`, or hide it when nothing is selected.
+function updateInspector(creature) {
+  if (!creature) {
+    inspectorEl.hidden = true;
+    return;
+  }
+  inspectorEl.hidden = false;
+
+  const g = creature.genome;
+  inspectorTitle.textContent = `Creature #${creature.id}`;
+  // The swatch shows the clade colour the lineage view paints by, so the panel
+  // ties back to the on-canvas colouring.
+  inspectorSwatch.style.background = `hsl(${g.lineageHue.toFixed(0)}, 65%, 55%)`;
+
+  const energyPct = Math.round((creature.energy / CONFIG.creature.maxEnergy) * 100);
+  const rows = [
+    section("Vitals"),
+    row("Role", trophicRole(g.diet)),
+    row("Generation", creature.generation),
+    row("Age", `${creature.age.toFixed(0)}s`),
+    row("Energy", energyBar(creature.energy)),
+    row("Energy %", `${energyPct}%`),
+    row("Position", `${creature.x.toFixed(0)}, ${creature.y.toFixed(0)}`),
+    section("Body & senses"),
+    geneRow("speed", g.speed),
+    geneRow("sense", g.sense),
+    geneRow("size", g.size),
+    geneRow("turnRate", g.turnRate),
+    geneRow("metabolismEff", g.metabolismEff),
+    geneRow("wander", g.wander),
+    section("Diet & niche"),
+    geneRow("diet", g.diet),
+    geneRow("forage", g.forage),
+    geneRow("hunt", g.hunt),
+    geneRow("warmthPref", g.warmthPref),
+    geneRow("wetnessPref", g.wetnessPref),
+    section("Social"),
+    geneRow("foodVoice", g.foodVoice),
+    geneRow("alarmVoice", g.alarmVoice),
+    geneRow("foodTrust", g.foodTrust),
+    geneRow("alarmTrust", g.alarmTrust),
+    geneRow("kinship", g.kinship),
+    geneRow("mating", g.mating),
+    geneRow("mateChoice", g.mateChoice),
+  ];
+  inspectorBody.innerHTML = rows.join("");
+}
+
+function section(label) {
+  return `<div class="isect">${label}</div>`;
+}
+
+// A genome row: the gene's value, plus a thin bar showing where it sits within
+// its legal [min, max] envelope, so an at-a-glance "high / low for this trait"
+// reads without knowing each gene's range. Genes carrying a known range get the
+// bar; anything else (none today) falls back to the raw number.
+function geneRow(name, value) {
+  const range = GENES[name];
+  if (!range) return row(name, fmtGene(value));
+  const [min, max] = range;
+  const frac = max > min ? (value - min) / (max - min) : 0;
+  return `<div class="row"><span class="label">${name}</span><span class="value">${geneMeter(frac)} ${fmtGene(value)}</span></div>`;
+}
+
+// Format a gene value: large-magnitude genes (speed, sense) read as whole
+// numbers, the smaller ones (the [0,1] traits, plus size/turnRate/metabolismEff)
+// to two decimals, so the numbers stay legible rather than uniformly noisy.
+function fmtGene(v) {
+  return Math.abs(v) >= 10 ? v.toFixed(0) : v.toFixed(2);
+}
+
+// A tiny inline bar (filled blocks out of a fixed width) for a [0,1] fraction:
+// the filled run in accent, the remaining track dim, so where the gene sits in
+// its range reads at a glance.
+function geneMeter(frac) {
+  const width = 6;
+  const filled = Math.round(clamp01(frac) * width);
+  return `<span class="meter"><span class="mfill">${"▰".repeat(filled)}</span>${"▱".repeat(width - filled)}</span>`;
+}
+
+// A wider energy bar against the species cap, coloured from red (starving) to
+// teal (full), so the inspected creature's condition reads at a glance.
+function energyBar(energy) {
+  const frac = clamp01(energy / CONFIG.creature.maxEnergy);
+  const hue = Math.round(frac * 150); // 0 red → 150 green-teal
+  const pct = Math.round(frac * 100);
+  return `<span class="ebar"><span class="efill" style="width:${pct}%;background:hsl(${hue},70%,50%)"></span></span>`;
+}
+
+document.getElementById("inspector-close").addEventListener("click", () => select(null));
+
+// Esc clears the selection, a familiar "dismiss" shortcut.
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && selectedId != null) select(null);
+});
+
 // --- Controls ---
 
 document.getElementById("pause").addEventListener("click", (e) => {
@@ -241,14 +401,20 @@ const tools = new ToolController({
   canvas,
   renderer,
   getWorld: () => world,
+  // The Inspect brush reports the creature under the pointer (or null on empty
+  // ground), which selects it / clears the selection.
+  onPick: (creature) => select(creature),
 });
 
-// Cycle the active brush (food ↔ creature), mirroring the colour toggle.
+// Cycle the active brush (food → creature → inspect), mirroring the colour
+// toggle. The canvas cursor follows the brush — a pointer for Inspect, the
+// painting crosshair otherwise — so the active mode reads off the cursor too.
 const toolBtn = document.getElementById("tool");
 toolBtn.addEventListener("click", () => {
   const i = TOOLS.indexOf(tools.tool);
   tools.setTool(TOOLS[(i + 1) % TOOLS.length]);
   toolBtn.textContent = "Tool: " + TOOL_LABELS[tools.tool];
+  canvas.style.cursor = tools.tool === "inspect" ? "pointer" : "crosshair";
 });
 
 // --- Boot ---
