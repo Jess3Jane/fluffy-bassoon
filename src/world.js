@@ -475,6 +475,30 @@ export class World {
     return best;
   }
 
+  // The live creature nearest `self` that counts as *kin* — its lineage hue
+  // within `kinTolerance` of self's (`hueSimilarity > 0`, the same kin/stranger
+  // threshold the scent, mate-choice, and species-count layers use) — or null if
+  // no relative is alive. Powers the inspector's click-through "nearest kin"
+  // link, so it searches the whole world (not a sense window) to find a relative
+  // wherever one is, and — like `creatureAt` — scans the live list directly: a
+  // one-off, click-rate lookup is trivially cheap to scan and always reflects
+  // exact current positions (the grid is only rebuilt at the step boundary).
+  nearestKin(self) {
+    const tol = CONFIG.scent.kinTolerance;
+    let best = null;
+    let bestD2 = Infinity;
+    for (const c of this.creatures) {
+      if (c === self || !c.alive) continue;
+      if (hueSimilarity(self.lineageHue, c.lineageHue, tol) <= 0) continue;
+      const d2 = wrapDistSq(self.x, self.y, c.x, c.y, this.width, this.height);
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        best = c;
+      }
+    }
+    return best;
+  }
+
   // Record one sexual mating for the reproductive-isolation readout. `cross` is
   // true when the pairing bridged two lineages (the parents sat more than
   // `kinTolerance` apart on the hue wheel), false when it stayed within one.

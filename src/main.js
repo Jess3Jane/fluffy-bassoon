@@ -303,6 +303,46 @@ const inspectorSwatch = document.getElementById("inspector-swatch");
 const inspectorBody = document.getElementById("inspector-body");
 const followBtn = document.getElementById("inspector-follow");
 
+// Click-through links: persistent buttons that hop the inspector to a creature
+// related to the inspected one. They live *outside* the per-frame innerHTML
+// rebuild of `#inspector-body` (which would replace any button mid-click) and
+// instead hold their live target id, refreshed each frame by `updateLinks`, so a
+// click always lands. Each spec names the related creature it resolves to.
+const inspectorLinksEl = document.getElementById("inspector-links");
+const LINK_SPECS = [
+  { label: "Nearest kin", resolve: (c) => world.nearestKin(c) },
+  { label: "Target", resolve: (c) => liveCreatureById(c.targetId) },
+];
+const linkButtons = (() => {
+  const head = document.createElement("div");
+  head.className = "isect";
+  head.textContent = "Links";
+  inspectorLinksEl.appendChild(head);
+  return LINK_SPECS.map((spec) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ilink";
+    btn.addEventListener("click", () => {
+      const target = liveCreatureById(btn._targetId);
+      if (target) selectKeepingFollow(target);
+    });
+    inspectorLinksEl.appendChild(btn);
+    return btn;
+  });
+})();
+
+// Refresh the link buttons for the inspected creature: resolve each related
+// creature live, stash its id on the button, and disable the link when there's
+// nothing to jump to (no kin alive, or not hunting a creature right now).
+function updateLinks(creature) {
+  linkButtons.forEach((btn, i) => {
+    const target = creature ? LINK_SPECS[i].resolve(creature) : null;
+    btn._targetId = target ? target.id : null;
+    btn.disabled = !target;
+    btn.textContent = `${LINK_SPECS[i].label} → ${target ? "#" + target.id : "—"}`;
+  });
+}
+
 // Set (or clear) the inspector selection. Passing a creature focuses on it;
 // passing null deselects. Updates the renderer highlight immediately so a click
 // feels responsive even between HUD refreshes. A fresh selection always starts
@@ -326,15 +366,31 @@ function setFollow(on) {
 
 followBtn.addEventListener("click", () => setFollow(!follow));
 
-// Find the live, still-alive creature matching the current selection id, or null
-// if it has died or the world was swapped. O(n) but only while something is
-// selected, and only once per frame.
-function resolveSelection() {
-  if (selectedId == null) return null;
+// Find the live, still-alive creature with the given id, or null if it has died
+// or the world was swapped. O(n), used at click rate and once per frame for the
+// selection — trivially cheap and always reflects exact current state.
+function liveCreatureById(id) {
+  if (id == null) return null;
   for (const c of world.creatures) {
-    if (c.id === selectedId && c.alive) return c;
+    if (c.id === id && c.alive) return c;
   }
   return null;
+}
+
+// Resolve the current inspector selection (held by id) to the live creature.
+function resolveSelection() {
+  return liveCreatureById(selectedId);
+}
+
+// Jump the inspector to a creature reached through a click-through link (its
+// nearest kin or current target). If the camera was following the previous
+// selection, keep following the new one — so a link is a "select-and-follow in
+// one hop" through the world rather than dropping the chase; otherwise it's a
+// plain re-select.
+function selectKeepingFollow(creature) {
+  const wasFollowing = follow;
+  select(creature);
+  if (wasFollowing) setFollow(true);
 }
 
 // The diet gene reads as a trophic role for a quick human label, splitting the
@@ -393,6 +449,7 @@ function updateInspector(creature) {
     geneRow("mateChoice", g.mateChoice),
   ];
   inspectorBody.innerHTML = rows.join("");
+  updateLinks(creature);
 }
 
 function section(label) {

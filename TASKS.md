@@ -1192,17 +1192,61 @@ population dynamics, natural selection, and surprising behaviour.
       on the left and the inspector / camera controls on the right — where opening
       it, reading every swatch, and flipping trophic↔lineage all verified clean.
 
+- [x] **UI/UX: click-through inspector links** (follow-up (c) to the
+      inspector/camera). The inspector could only ever be pointed at a creature by
+      *clicking it on the canvas* — there was no way to hop from the inspected
+      individual to a *related* one, even though the world is full of relationships
+      (kin, predator→prey) the rest of the simulation already computes. A **Links**
+      section now sits at the foot of the panel with two navigation buttons that
+      jump the selection to a creature reached *through* the inspected one: **Nearest
+      kin** → `World.nearestKin(self)`, the spatially-nearest live creature within
+      `scent.kinTolerance` on the lineage-hue wheel (`hueSimilarity > 0` — the exact
+      kin/stranger threshold the scent, mate-choice, and species-count layers use),
+      searching the whole world (not a sense window) so it finds a relative wherever
+      one is; and **Target** → the creature the inspected one is currently steering
+      toward, when that's another creature (its prey). For the latter, `Creature.update`
+      now records the chosen target's id on `this.targetId` whenever the picked target
+      *is* a creature (`target === prey`), and null when it's heading for food or
+      wandering — food isn't an inspectable creature, so a grazer's link stays inert.
+      `targetId` is a *transient view annotation*: it's refreshed every step, never
+      serialized, and draws no rng, so it changes nothing about the simulation or its
+      save format (no `SAVE_VERSION` bump; every replay/save test passes untouched).
+      A link with nothing to resolve to (no kin alive, or not hunting a creature this
+      step) is shown disabled with a "—" rather than hidden, so the panel's shape is
+      stable. Clicking a live link **selects-and-follows in one hop**: if the camera
+      was following the previous selection it keeps following the new one
+      (`selectKeepingFollow` re-engages follow after the re-select), so you can walk a
+      lineage or a hunt across a zoomed-in world without losing the chase; otherwise
+      it's a plain re-select. The non-obvious bit was the buttons' *lifetime*:
+      `updateInspector` rewrites `#inspector-body`'s innerHTML every frame (~per rAF),
+      which would replace any button mid-click and drop the event — so the links live
+      in a *separate, persistent* `#inspector-links` container, built once with stable
+      `<button>` elements whose live target id, label, and disabled state
+      `updateLinks` refreshes each frame, so a click always lands on a real element.
+      Purely a *view* feature beyond the one transient annotation — no serialized
+      state, no simulation logic touched — so the headless suite stays green;
+      `test/inspector-links.test.mjs` covers the two pure resolutions: `nearestKin`
+      (nearest kin beating a nearer stranger, the dead/self exclusions, the exact
+      in/out-of-tolerance boundary, null with no kin) and the `targetId` recording (a
+      hunting carnivore records its prey, the target clears to null when the prey is
+      gone, and a grazer steering toward food records null). The DOM panel and the
+      select-and-follow wiring need a browser, so — like the renderer, tools, and main
+      entry — they were checked there: selecting a creature showed the **Links**
+      section with a live **Nearest kin → #id** and a disabled **Target → —**;
+      clicking the kin link jumped the inspector to that relative (and its own nearest
+      kin pointed back, a mutual nearest pair); and watching the running world caught a
+      carnivore with a live **Target → #id** link to the prey it was chasing.
+
 ## Next up
 
-- [ ] **UI/UX, continued.** Five passes have landed — a *creature inspector*, a
+- [ ] **UI/UX, continued.** Six passes have landed — a *creature inspector*, a
       *pan/zoom camera*, *collapsible stat groups*, a *follow-selected camera
-      mode*, and now an *in-app legend* (all below); remaining follow-ups: (c)
-      **click-through inspector links** — jump from a creature to its nearest kin
-      or its current target (the camera can zoom to it and now *follow* it too, so a
-      link could select-and-follow in one click); (e) **smooth zoom inertia** — the
-      remaining pinch/zoom polish now that *follow-selected* (keep the inspected
-      creature centred as it moves) has landed; eased wheel/button zoom would round
-      out the camera feel.
+      mode*, an *in-app legend*, and now *click-through inspector links* (all
+      below); remaining follow-up: (e) **smooth zoom inertia** — the remaining
+      pinch/zoom polish now that *follow-selected* (keep the inspected creature
+      centred as it moves) and the click-through links (which *select-and-follow*
+      a related creature in one hop) have landed; eased wheel/button zoom would
+      round out the camera feel.
 - [ ] **Widen the realised canopy sort — kin-structured canopy as a public good.**
       The spatial sort is now *realised* (above): viability withering pulls barren
       stands onto heavy canopy and fertile stands onto light, a robust +0.045 across
