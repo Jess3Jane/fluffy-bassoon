@@ -326,8 +326,21 @@ export const CONFIG = {
       mutationStep: 0.05, // std-dev of the per-inheritance drift of the canopy gene
       inheritRadius: 90, // a sprout copies the nearest same-kind plant within this reach
       fecundityCost: 0.55, // germination ∝ (1 − fecundityCost·canopy): cheap seeding favours low
-      facilitation: 1.4, // peak germination bonus a parent's canopy gives its seedlings
+      facilitation: 1.4, // peak germination bonus a parent's canopy gives its seedlings (at reference harshness)
       facilitationSlope: 3, // how fast that (saturating) shelter benefit ramps with canopy
+
+      // The shelter benefit is *condition-dependent*: it pays more where seedlings
+      // actually struggle. The local **harshness** (in [0, 1], 0 benign → 1 harsh;
+      // `World.canopyHarshnessAt`, driven by terrain barrenness — barren ground is
+      // where a sprout most needs cover) scales the facilitation term, so the canopy
+      // optimum *diverges across the map*: heavy investment is favoured on barren
+      // soil where shelter is worth its fecundity cost, light-touch seeding on
+      // fertile soil where it isn't. The gain becomes a spatial trait that sorts with
+      // the biome (the way `warmthPref` / `forage` already do) instead of settling to
+      // one global band. At `harshnessRef` the scale is exactly 1, so the curve (and
+      // a default, harshness-free `canopyGermination(c)` call) matches the old tuning.
+      harshnessRef: 0.3, // reference harshness where the shelter benefit equals `facilitation`
+      harshnessGain: 2.4, // how strongly local harshness scales the shelter benefit (clamped ≥ 0)
     },
   },
 

@@ -14,7 +14,7 @@ import {
   forageYield,
   huntYield,
 } from "./genome.js";
-import { wrapDistSq } from "./math.js";
+import { wrapDistSq, clamp01 } from "./math.js";
 import { daylight, foodGrowthFactor } from "./daycycle.js";
 import {
   seasonLevel,
@@ -212,7 +212,7 @@ export class World {
         const fertility =
           this.terrain.fertilityAt(px, py) *
           kindFertilityFactor(kind, dw, dm) *
-          canopyGermination(localCanopy);
+          canopyGermination(localCanopy, this.canopyHarshnessAt(px, py));
         if (this.rng.chance(fertility)) {
           const f = { x: px, y: py, kind, canopyAmp: inheritCanopy(localCanopy, this.rng) };
           this.food.push(f);
@@ -266,6 +266,19 @@ export class World {
       }
     });
     return best ? best.canopyAmp ?? CONFIG.vegetation.canopy.neutral : CONFIG.vegetation.canopy.neutral;
+  }
+
+  // How hard a spot is for a seedling, in [0, 1] (0 benign → 1 harsh) — the local
+  // condition that makes a parent's canopy shelter worth its fecundity cost (or
+  // not), so the evolved canopy optimum *diverges across the map* instead of
+  // settling to one global band (`canopyGermination`). Driven by terrain
+  // barrenness: a sprout most needs cover where the soil is poorest, so harshness
+  // is the complement of the tile's fertility (fertile soil ≈ benign, barren ≈
+  // harsh). Static and rng-free — it draws no random stream and rebuilds
+  // identically from a restored save, so it never perturbs the deterministic
+  // simulation.
+  canopyHarshnessAt(x, y) {
+    return clamp01(1 - this.terrain.fertilityAt(x, y));
   }
 
   // Nearest food to a point within `radius`, or null. Uses the food grid. When a

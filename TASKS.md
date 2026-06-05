@@ -953,6 +953,43 @@ population dynamics, natural selection, and surprising behaviour.
       drag); the DOM input wiring needs a browser, so — like the renderer, tools, and
       main entry point — it's exercised by hand rather than in the headless suite.
 
+- [x] **Condition-dependent canopy optimum: the niche-construction gain becomes a
+      spatial selection target.** The heritable `canopyAmp` gene (how hard a plant
+      shapes its understory) was already under selection, but the *balance* that set
+      its optimum — a falling fecundity cost against a saturating facilitation
+      (shelter) benefit, in `canopyGermination` — was the same everywhere, so the
+      evolved gain settled to one global band. This ties the *shelter* benefit to
+      where seedlings actually struggle, so the optimum **diverges across the map**:
+      `canopyGermination(c, harshness)` now scales the facilitation term by the local
+      harshness, and `World.canopyHarshnessAt(x, y)` reads that harshness off the
+      terrain (the complement of tile fertility — a sprout most needs cover on barren
+      soil, least on fertile). The fecundity cost is unchanged, so on harsh (barren)
+      ground the shelter is worth its cost and the optimum climbs (~0.41), while on
+      benign (fertile) ground cheap light-touch seeding wins and it falls (~0.22) —
+      a clade founding on barren soil is selected toward heavy canopy, one on fertile
+      soil toward light, the feedback gain now sorting with the biome the way
+      `warmthPref` / `forage` already do. The scale is clamped non-negative (an
+      extreme-benign spot zeroes the shelter benefit rather than inverting it into a
+      penalty), and pinned to equal the base facilitation at a `harshnessRef`, so the
+      harshness-omitted `canopyGermination(c)` call reproduces the old curve *exactly*
+      — the world is unchanged where conditions sit at the reference, and the
+      established global-selection behaviour (and every one-arg call in
+      `test/canopy.test.mjs`) is preserved. Harshness is a pure function of the static
+      terrain: it draws **no rng** and adds **no serialized state**, so a restored
+      world replays bit-for-bit (no `SAVE_VERSION` bump) — the persistence and canopy
+      round-trip tests pass untouched. `test/canopy-niche.test.mjs` covers the optimum
+      rising monotonically with harshness (and staying interior at every level), the
+      non-negative clamp at the benign extreme, the default-equals-reference identity,
+      terrain driving harshness without touching the rng stream, and the end-to-end
+      ordering (canopy selected heavier on a real barren tile than a fertile one).
+      *Caveat / deeper cut:* this makes the spatial selection *target* diverge
+      cleanly, but the realised standing larder only sorts weakly — at this
+      population scale, dispersal (canopy inheritance copies the nearest same-kind
+      parent within `inheritRadius`, mixing barren and fertile lineages) and drift
+      swamp the gentle gradient. Genuinely *realising* the spatial sort — a
+      kin-structured canopy as a public good sustained only among lineage neighbours,
+      and/or tighter canopy dispersal — is the follow-up below.
+
 ## Next up
 
 - [ ] **UI/UX, continued.** Two passes have landed — a *creature inspector* and
@@ -967,17 +1004,28 @@ population dynamics, natural selection, and surprising behaviour.
       (e) **two-finger pinch follow-ups** — the camera handles pinch/pan, but a
       *follow-selected* mode (keep the inspected creature centred as it moves) and
       smooth zoom inertia would round it out.
-- [ ] **Make the canopy optimum condition-dependent**, so niche construction
-      diverges across the map instead of settling to one global band. Right now the
-      facilitation/fecundity balance (and so the evolved `canopyAmp`) is the same
-      everywhere; tie the *shelter* benefit to where seedlings actually struggle —
-      e.g. stronger facilitation on barren terrain, in harsh microclimates, or under
-      heavy grazing — so a clade evolves heavy canopy where entrenching pays and
-      light canopy where it doesn't, and the feedback gain becomes a *spatial* trait
-      that sorts with the biome (the way `warmthPref`/`forage` already do). A
-      kin-structured variant (canopy as a public good sustained only among lineage
-      neighbours, echoing the scent-signalling kinship work) is the deeper cut. Or
-      pick a seed below.
+- [ ] **Realise the spatial canopy sort — make the standing larder actually
+      diverge, not just the selection target.** The condition-dependent optimum has
+      landed (above): the canopy a sprout is selected toward now climbs on barren
+      soil and falls on fertile, so the *gradient* sorts with the biome. But at the
+      current scale the *realised* `canopyAmp` distribution barely tracks it —
+      dispersal (a sprout inherits the nearest same-kind parent within
+      `inheritRadius`, which spans a couple of terrain tiles and mixes barren and
+      fertile lineages) plus drift swamp the gentle pull, so the standing larder's
+      barren-vs-fertile mean canopy is noisy and near-flat. Close that gap so a walk
+      across the map shows visibly heavier canopy on barren ground. Levers, roughly
+      in order of cleanliness: (a) **tighter canopy dispersal** — shrink the
+      inheritance reach (or weight it toward the very nearest parent) so a lineage
+      stays in its patch long enough to adapt to it, without disturbing the global
+      selection equilibrium; (b) **a steeper local gradient** — let harshness fold in
+      the static microclimate stress and/or live grazing pressure (not just terrain
+      fertility) so the barren↔fertile optimum spread is wider than terrain alone
+      gives; (c) the deeper cut — **kin-structured canopy as a public good**, the
+      shelter benefit shared only among lineage neighbours (echoing the
+      scent-signalling kinship work), so investment is defended against cheaters
+      patch-by-patch. Add a **barren-vs-fertile mean-canopy readout** to `stats()` /
+      the HUD so the divergence (or its absence) is legible while tuning. Or pick a
+      seed below.
 
 ## Ideas / someday
 
