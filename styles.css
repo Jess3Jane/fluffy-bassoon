@@ -245,6 +245,26 @@ button:disabled:hover { background: rgba(111, 211, 199, 0.12); }
   color: var(--muted);
 }
 
+/* --- Minimap: a world-overview thumbnail embedded in the HUD ---
+   Lives in the HUD's left column under the charts (like the charts, an embedded
+   overview canvas), so it never collides with the floating panels that own the
+   other corners. The canvas is sized to the world's aspect ratio by the renderer
+   and centred; click or drag it to jump the main view there. */
+
+#minimap {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+}
+
+#minimap-canvas {
+  display: block;
+  border-radius: 6px;
+  background: rgba(8, 12, 19, 0.5);
+  cursor: crosshair;
+  touch-action: none; /* let the drag-to-navigate own the gesture on touch */
+}
+
 /* --- Camera controls (bottom-right): zoom in / out / reset view --- */
 
 #camera-controls {
