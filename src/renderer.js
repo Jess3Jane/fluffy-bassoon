@@ -7,19 +7,7 @@ import { kindRhythm, kindClimateRhythm } from "./plants.js";
 import { weatherNoise, windStrength, windDirection } from "./weather.js";
 import { TILE } from "./terrain.js";
 import { SCENT } from "./scent.js";
-
-// Fill colours per tile kind, indexed by the TILE enum. Grass doubles as the
-// world backdrop, so only the patches that differ from it are drawn over the top.
-const TILE_COLORS = [
-  "#0e1a17", // grass — the base ground
-  "#15364e", // water — deep blue
-  "#163a22", // fertile — rich green
-  "#332b1d", // barren — dry brown
-];
-
-// Fill colours per plant kind: kind 0 a leafy green, kind 1 a violet, so the two
-// sub-resources creatures partition along read apart at a glance.
-const FOOD_COLORS = ["#3f7d52", "#7d6fb0"];
+import { TILE_COLORS, FOOD_COLORS } from "./palette.js";
 
 // How many cells across to sample the microclimate wash. Coarse — the field is
 // broad regional patches, not fine detail — so the overlay stays cheap.

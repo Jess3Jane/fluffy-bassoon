@@ -1164,19 +1164,45 @@ population dynamics, natural selection, and surprising behaviour.
       Follow visibly zoomed to and centred the inspected creature, and its death
       released the camera and closed the inspector.
 
+- [x] **In-app legend for the canvas colours and washes.** Everything painted on
+      the world encodes something — but until now none of it was documented on
+      screen, so a newcomer had to read the source to learn that violet plants are
+      the night-leaning kind or that the amber wash means a warmer microclimate. A
+      folding **Legend** panel (`#legend`, a `<details>` chip anchored bottom-centre,
+      collapsed by default so it stays a single tag until opened) now names each
+      colour: the *creatures* key (trophic green→red diet gradient, or — when the
+      colour toggle is on Lineage — the clade hue wheel), the two *plant* kinds
+      (sun/moon leaf), the *terrain* tiles (water/fertile/barren over the grass
+      base), the amber↔blue *climate wash*, the green/red *scent* plumes, and the
+      *sky* washes (night veil, rain, drought). The swatch colours are not
+      re-typed: a new `src/palette.js` holds every canvas colour as the single
+      source of truth, imported by both the renderer (which dropped its private
+      `TILE_COLORS` / `FOOD_COLORS` copies) and the legend, so a hue change updates
+      both together and they can never drift. The legend is built from a pure
+      `legendModel(colorMode)` data function (`src/legend.js`) that
+      `renderLegend` turns into DOM; `main.js` renders it on boot and rebuilds it
+      whenever the colour toggle flips, so the creatures key always matches the
+      bodies on the canvas. Purely presentational — no rng, no serialized state, no
+      simulation touch — so the headless suite stays green; `test/legend.test.mjs`
+      covers the pure model (every section/item well-formed, the creatures section
+      mode-dependent while the rest is shared, swatches sourced from the palette).
+      Placement was checked in the browser at desktop and small sizes: the first
+      bottom-left attempt overlapped the (tall, full-height) HUD column and
+      swallowed its control clicks, so it moved to bottom-centre — clear of the HUD
+      on the left and the inspector / camera controls on the right — where opening
+      it, reading every swatch, and flipping trophic↔lineage all verified clean.
+
 ## Next up
 
-- [ ] **UI/UX, continued.** Four passes have landed — a *creature inspector*, a
-      *pan/zoom camera*, *collapsible stat groups*, and now a *follow-selected camera
-      mode* (all below); remaining follow-ups: (c)
+- [ ] **UI/UX, continued.** Five passes have landed — a *creature inspector*, a
+      *pan/zoom camera*, *collapsible stat groups*, a *follow-selected camera
+      mode*, and now an *in-app legend* (all below); remaining follow-ups: (c)
       **click-through inspector links** — jump from a creature to its nearest kin
       or its current target (the camera can zoom to it and now *follow* it too, so a
-      link could select-and-follow in one click); (d) a **legend**
-      for the canvas colours/washes (trophic vs. lineage, the amber/blue climate
-      wash, the green/violet plant kinds), which are currently undocumented in-app;
-      (e) **smooth zoom inertia** — the remaining pinch/zoom polish now that
-      *follow-selected* (keep the inspected creature centred as it moves) has landed;
-      eased wheel/button zoom would round out the camera feel.
+      link could select-and-follow in one click); (e) **smooth zoom inertia** — the
+      remaining pinch/zoom polish now that *follow-selected* (keep the inspected
+      creature centred as it moves) has landed; eased wheel/button zoom would round
+      out the camera feel.
 - [ ] **Widen the realised canopy sort — kin-structured canopy as a public good.**
       The spatial sort is now *realised* (above): viability withering pulls barren
       stands onto heavy canopy and fertile stands onto light, a robust +0.045 across
