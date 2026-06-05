@@ -47,9 +47,10 @@ import { sampleField } from "./terrain.js";
 import { clamp01 } from "./math.js";
 
 // The germination multiplier a sprout gets from its parent's canopy investment
-// `c` — the selection gradient on the heritable trait, and the source of truth for
-// both pressures that shape it. Two opposing terms, so an interior optimum emerges
-// from their balance rather than being dialled in:
+// `c` at a spot of local `harshness` — the selection gradient on the heritable
+// trait, and the source of truth for both pressures that shape it. Two opposing
+// terms, so an interior optimum emerges from their balance rather than being
+// dialled in:
 //   • a *fecundity cost*, linear and falling — building canopy diverts from seed,
 //     so heavier investers germinate less (`1 − fecundityCost·c`), favouring cheap
 //     light-touch seeding; floored at 0 so it can't go negative.
@@ -59,13 +60,28 @@ import { clamp01 } from "./math.js";
 // Their product is monotone-up where the ramping shelter outweighs the linear tax
 // and monotone-down once the tax wins, so germination peaks at an interior canopy
 // the population evolves toward and defends against drift — the feedback's gain is
-// now a selected trait, not a constant. A neutral/absent parent reads as no net
-// effect only to the extent the two terms cancel there; the curve is otherwise the
-// whole story (see `test/canopy.test.mjs` for its shape and argmax).
-export function canopyGermination(c) {
+// now a selected trait, not a constant.
+//
+// The shelter benefit is *condition-dependent*: `harshness` (in [0, 1], 0 benign →
+// 1 harsh) scales the facilitation term about a reference, so the optimum is not a
+// single global band but *diverges with the local conditions* — shelter pays its
+// fecundity cost on harsh (barren) ground, where the optimum climbs, and doesn't on
+// benign (fertile) ground, where cheap seeding wins and the optimum falls. At
+// `harshnessRef` the scale is exactly 1, so the default (harshness-omitted) call
+// reproduces the old curve, and the world is unchanged where conditions sit at the
+// reference. A neutral/absent parent reads as no net effect only to the extent the
+// two terms cancel there; the curve is otherwise the whole story (see
+// `test/canopy.test.mjs` for its shape and `test/canopy-niche.test.mjs` for the
+// harshness-driven shift and the spatial sorting it produces).
+export function canopyGermination(c, harshness = CONFIG.vegetation.canopy.harshnessRef) {
   const cfg = CONFIG.vegetation.canopy;
   const fecundity = Math.max(0, 1 - cfg.fecundityCost * c);
-  const shelter = 1 + cfg.facilitation * Math.tanh(cfg.facilitationSlope * c);
+  // Local harshness tilts the shelter benefit: harsher than the reference makes
+  // canopy worth more (a steeper, higher-peaking curve), benign makes it worth
+  // less. Clamped ≥ 0 so an extreme-benign spot zeroes the benefit rather than
+  // inverting it into a shelter *penalty*.
+  const facScale = Math.max(0, 1 + cfg.harshnessGain * (harshness - cfg.harshnessRef));
+  const shelter = 1 + cfg.facilitation * facScale * Math.tanh(cfg.facilitationSlope * c);
   return fecundity * shelter;
 }
 
