@@ -278,6 +278,30 @@ export const CONFIG = {
     wetnessAmplitude: 0.35, // peak wetness offset (±) a region adds to the weather
   },
 
+  // Vegetation feedback: the standing larder's reach back onto the microclimate
+  // (`src/vegetation.js`). The microclimate above is a *static* field grown from
+  // the seed — it shapes which plant kind grows where, but the plants never shape
+  // it back. This closes that loop: a stand of plants nudges its own local climate
+  // *toward the conditions its kind thrives in* (sunleaf warm-wet, moonleaf
+  // cool-dry), so a patch reinforces the very biome it grows in. The kind
+  // boundaries the seed only *fixed* can then sharpen, drift (as grazing thins a
+  // stand), and oscillate. It's recomputed each step from the live food, so it
+  // adds no serialized state. Two guards keep it from running away: the per-cell
+  // lean is squashed through tanh (bounded), and read relative to the larder's
+  // global mean (mean-respecting — the globally dominant kind is penalised on bare
+  // ground, pulling the world back toward an even split). At amplitude 0 every
+  // offset is 0 and the world behaves exactly as it did before the feedback.
+  vegetation: {
+    latticeCols: 12, // density-lattice columns (rows derived from the aspect ratio)
+    leanScale: 8, // net same-kind plants past the mean for a ~saturating nudge
+    // Kept gentle (~20% of the static microclimate's amplitude): enough to sharpen
+    // each kind's biome and rebalance a lopsided larder toward an even split, but
+    // small next to the static gradient so it perturbs the spatial sorting without
+    // washing it out. Larger values only erode that sorting for little extra gain.
+    warmthAmplitude: 0.08, // peak warmth nudge (±) a dense single-kind stand adds
+    wetnessAmplitude: 0.07, // peak wetness nudge (±) a dense single-kind stand adds
+  },
+
   // Scent / pheromone plumes: a drifting chemical field laid down by living
   // creatures that turns the prevailing wind into an information channel. A
   // feeding creature drops a "food here" plume; a creature killed drops a strong

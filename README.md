@@ -92,6 +92,19 @@ fuse into one coherent biome, and a warm-adapted, sunleaf-foraging clade finds a
 single region that suits both its tolerance and its diet. The HUD's **Biome** row
 reports how well the standing larder's kinds sit in the climate that favours each.
 
+And the loop runs the other way too: the **standing larder shapes the
+microclimate back**. A stand of plants nudges its own local warmth and wetness
+*toward the conditions its kind thrives in* — a sunleaf thicket warms and dampens
+its understory, a moonleaf stand cools and dries it — so a patch reinforces the
+very biome it grows in. That two-way coupling lets the kind boundaries the seed
+only fixed now **sharpen, drift, and oscillate**: grazing thins a stand and its
+grip on the climate loosens, letting the edge move. The nudge is held gentle and
+*mean-respecting* — read against the larder's global average, so whichever kind
+is globally winning is quietly penalised on bare ground, pulling the world back
+toward an even split rather than freezing onto one kind. It is recomputed each
+step from the live plants (no saved state, the climate wash visibly breathing with
+the larder), and at zero strength the world behaves exactly as before.
+
 The world is laid over a **terrain** map of grassland dotted with patches of
 water, fertile soil, and barren ground. Food springs up thickest on fertile
 soil, sparsely on barren ground, and never on water; creatures wade slowly

@@ -78,8 +78,10 @@ export class Renderer {
     this.drawTerrain(ctx, world.terrain);
     // Microclimate: a faint warm/cool wash over the ground so the spatial climate
     // mosaic the creatures sort along is visible — warm regions glow amber, cool
-    // ones blue — under the terrain detail and everything else.
-    this.drawMicroclimate(ctx, world.microclimate);
+    // ones blue — under the terrain detail and everything else. It shows the
+    // *living* climate (the static seed field plus the standing larder's
+    // vegetation feedback), so dense stands visibly tug the wash toward their kind.
+    this.drawMicroclimate(ctx, world);
     ctx.strokeStyle = "rgba(111, 211, 199, 0.15)";
     ctx.lineWidth = 1 / this.scale;
     ctx.strokeRect(0, 0, world.width, world.height);
@@ -171,20 +173,23 @@ export class Renderer {
   // sampling the local warmth offset and tinting amber where a region runs warmer
   // than the global average, blue where it runs cooler. The alpha tracks the
   // offset's size (capped low so it never fights the entities on top), so the
-  // strongest warm/cool corners read clearly while neutral ground stays bare.
-  // Purely a view of the static field — it holds no state and never changes.
-  drawMicroclimate(ctx, microclimate) {
+  // strongest warm/cool corners read clearly while neutral ground stays bare. It
+  // reads the *combined* offset (`world.warmthOffsetAt`) — the static seed field
+  // plus the standing larder's vegetation feedback — so the wash breathes with the
+  // larder as stands rise, get grazed down, and shift the kind boundaries.
+  drawMicroclimate(ctx, world) {
+    const microclimate = world.microclimate;
     const cols = MICROCLIMATE_CELLS;
     const rows = Math.max(1, Math.round(cols * (microclimate.height / microclimate.width)));
     const cw = microclimate.width / cols;
     const ch = microclimate.height / rows;
-    const amp = microclimate.warmthAmp || 1;
+    const amp = (microclimate.warmthAmp + world.vegetation.warmthAmp) || 1;
     const pad = 0.5 / this.scale;
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const x = (c + 0.5) * cw;
         const y = (r + 0.5) * ch;
-        const warm = microclimate.warmthOffsetAt(x, y) / amp; // ~[-1, 1]
+        const warm = world.warmthOffsetAt(x, y) / amp; // ~[-1, 1]
         const a = Math.min(0.14, Math.abs(warm) * 0.14);
         if (a < 0.005) continue;
         ctx.fillStyle =

@@ -778,22 +778,53 @@ population dynamics, natural selection, and surprising behaviour.
       bounded, matching a hand computation, null with no food, null/NaN-free with a
       flat microclimate), and the bit-identical save/load replay.
 
+- [x] The **larder feeds back onto the microclimate** — the last loop closed. The
+      microclimate was a one-way driver (a static seed field that shaped which kind
+      grows where, but nothing the plants did shaped it back); now the *standing*
+      larder nudges its own local climate, so the climate map and the plant
+      patchwork are a true two-way coupling. The nudge (`src/vegetation.js`) is
+      *kind-aware*, which is what makes it more than a wash: each kind pulls its
+      microclimate *toward the conditions it already thrives in* (sunleaf warms &
+      dampens its understory, moonleaf cools & dries it — matching their own
+      `kindClimateScore` leans), so a stand reinforces the very biome it grows in.
+      Two guards from the brief keep it from running away: **bounded** — a per-cell
+      signed lean (sunleaf +1, moonleaf −1, binned onto a coarse wrapping lattice)
+      is squashed through `tanh`, so even a monoculture cell gives a finite nudge,
+      ~20% of the static field's amplitude; **mean-respecting** — the lean is read
+      *relative to the larder's global mean*, so the globally dominant kind is
+      penalised on bare ground (a self-balancing pull) even as each patch sharpens
+      locally, and the spatial-average nudge is ~0 (no global warming/cooling). It
+      adds **no serialized state**: `VegetationField.rebuild(food)` recomputes the
+      field each step from the live larder at the *step boundary* (before any of the
+      step's growth or grazing), so a loaded world rebuilds the identical field from
+      its restored food and replays bit-for-bit — no SAVE_VERSION bump. Everything
+      that reads the local climate now goes through one combined accessor
+      (`World.warmthOffsetAt` / `wetnessOffsetAt` = static microclimate + vegetation
+      nudge): a creature's `climateStress`, a new plant's kind/fertility in
+      `spawnFood`, and the renderer's amber/blue wash (which now breathes with the
+      larder as stands rise, get grazed down, and shift the boundaries). At
+      amplitude 0 the term vanishes and the world is identical to before. A 200s ×5
+      headless sweep confirms the design: population holds its band (no
+      barren/frozen runaway), both kinds persist, the larder's in-biome alignment
+      *sharpens* (0.57 → 0.62), and a lopsidedly moonleaf larder (sun:moon ≈
+      0.31:0.69 off) **rebalances toward an even split** (≈0.47:0.53 on) — the
+      mean-respecting centring working exactly as intended.
+      `test/vegetation.test.mjs` covers the pure field (empty → zero, rebuild
+      determinism, the ±amplitude `tanh` bound, the kind-aware direction, the
+      mean-respecting centring & ~0 spatial average), the combined `World` accessor
+      and its no-food / amp-0 fallbacks, that `update` rebuilds from the live
+      larder, and the no-new-state bit-identical save/load replay.
+
 ## Next up
 
-- [ ] Let the **larder feed back onto the microclimate gradient** the creatures
-      already sort along — give vegetation a local cooling/wetting influence, so a
-      dense patch of plants nudges its own region's effective warmth/wetness (a
-      green canopy runs cooler and damper, bare ground hotter and drier). That
-      would close the last loop: the microclimate shapes which kind grows where
-      (just landed), and the standing vegetation would in turn shape the
-      microclimate — a slow two-way coupling that could make biome boundaries
-      sharpen, drift, or oscillate rather than sitting fixed on the seed's noise.
-      Care needed to keep it a *bounded, mean-respecting* nudge (like the existing
-      centred climate tilts) so it enriches the dynamics without running away into
-      a frozen or a barren world; and to keep it deterministic (it would have to
-      become real serialized state, since it depends on where plants stand, unlike
-      the pure-in-time/seed climate so far — or be recomputed each step from the
-      live larder, adding no state). Or pick a seed below.
+- [ ] **Make the vegetation feedback's strength heritable / trait-driven** instead
+      of a flat per-kind constant — e.g. a plant gene (or a per-kind `canopyAmp`)
+      for how strongly a stand shapes its microclimate, so a clade can *invest* in
+      niche construction (entrench its biome harder) at some cost, and selection
+      can tune the feedback rather than the config fixing it. That would let the
+      loop's own gain evolve — runaway-entrenching lineages vs. light-touch ones —
+      on top of the boundary sharpening/drift it already produces. Or pick a seed
+      below.
 
 ## Ideas / someday
 

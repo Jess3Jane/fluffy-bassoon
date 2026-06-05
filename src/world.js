@@ -25,6 +25,7 @@ import {
 } from "./weather.js";
 import { Terrain } from "./terrain.js";
 import { Microclimate } from "./microclimate.js";
+import { VegetationField } from "./vegetation.js";
 import { ScentField } from "./scent.js";
 import {
   plantKindAt,
@@ -97,6 +98,13 @@ export class World {
     this.microclimateSeed = 0;
     this.microclimate = new Microclimate(this.width, this.height, this.microclimateSeed);
 
+    // The vegetation feedback: the standing larder's reach back onto the
+    // microclimate (`src/vegetation.js`). It holds *no* serialized state — it is
+    // recomputed from the live food at the top of every `update` — so it needs no
+    // seed and no save handling; a fresh field is all-zero (no nudge) until the
+    // first step rebuilds it from the larder.
+    this.vegetation = new VegetationField(this.width, this.height);
+
     // The scent / pheromone field: drifting plumes creatures lay as they feed
     // and die, smelled by others. Starts empty in every world (it's grown by
     // play, not seeded), and is restored from a save on load.
@@ -142,6 +150,21 @@ export class World {
     this.peakPopulation = this.creatures.length;
   }
 
+  // The *effective* local climate offset at a point: the static microclimate
+  // (grown from the seed) plus the living vegetation nudge (the standing larder's
+  // feedback, rebuilt each step in `update`). Every consumer of the local climate
+  // — a creature's stress, a new plant's kind/fertility, the renderer's wash —
+  // reads it through here, so the fixed seed map and the larder's two-way feedback
+  // are always combined in one place. With an empty larder (or the feedback off)
+  // the vegetation term is 0 and these fall back to the bare microclimate.
+  warmthOffsetAt(x, y) {
+    return this.microclimate.warmthOffsetAt(x, y) + this.vegetation.warmthOffsetAt(x, y);
+  }
+
+  wetnessOffsetAt(x, y) {
+    return this.microclimate.wetnessOffsetAt(x, y) + this.vegetation.wetnessOffsetAt(x, y);
+  }
+
   // Add a food pellet and return it, or null if the world is at its food
   // carrying capacity (or — for a random spawn — no fertile ground turned up).
   //
@@ -153,19 +176,21 @@ export class World {
     if (this.food.length >= CONFIG.food.maxCount) return null;
 
     if (x === undefined) {
-      // A random spawn samples the terrain *and* the microclimate: it makes a
+      // A random spawn samples the terrain *and* the local climate: it makes a
       // few attempts, keeping the first spot whose terrain fertility — tilted by
       // how well the kind that would sprout there suits the local climate — wins
       // a roll. So plants cluster on fertile soil (as before) and each kind also
       // clusters in the region its climate favours, the spatial climate mosaic
-      // and the plant patchwork reinforcing one biome map. The microclimate
-      // regrows bit-for-bit from its seed and draws no rng, so the attempt count
-      // (and thus the rng stream) is unchanged from the terrain-only version.
+      // and the plant patchwork reinforcing one biome map. The local climate is
+      // the static microclimate *plus the living vegetation feedback* (via
+      // `warmthOffsetAt`), so a stand sharpens its own biome — and because both
+      // terms draw no rng, the attempt count (and thus the rng stream) is
+      // unchanged, and the field rebuilds identically from a restored save.
       for (let i = 0; i < CONFIG.terrain.foodAttempts; i++) {
         const px = this.rng.range(0, this.width);
         const py = this.rng.range(0, this.height);
-        const dw = this.microclimate.warmthOffsetAt(px, py);
-        const dm = this.microclimate.wetnessOffsetAt(px, py);
+        const dw = this.warmthOffsetAt(px, py);
+        const dm = this.wetnessOffsetAt(px, py);
         const kind = plantKindAt(px, py, kindClimateBias(dw, dm));
         const fertility =
           this.terrain.fertilityAt(px, py) * kindFertilityFactor(kind, dw, dm);
@@ -180,9 +205,10 @@ export class World {
 
     // Explicit placement (the food brush): planted verbatim wherever asked,
     // terrain or not — but the kind still reflects the local biome (the same
-    // climate-biased patchwork a natural sprout would land on).
-    const dw = this.microclimate.warmthOffsetAt(x, y);
-    const dm = this.microclimate.wetnessOffsetAt(x, y);
+    // climate-biased patchwork a natural sprout would land on, vegetation
+    // feedback included).
+    const dw = this.warmthOffsetAt(x, y);
+    const dm = this.wetnessOffsetAt(x, y);
     const f = { x, y, kind: plantKindAt(x, y, kindClimateBias(dw, dm)) };
     this.food.push(f);
     return f;
@@ -402,6 +428,15 @@ export class World {
 
   update(dt) {
     this.time += dt;
+
+    // Rebuild the vegetation feedback from the larder as it stands at the *start*
+    // of the step — before this step's growth or grazing changes it — so every
+    // climate read this step (food spawn below, each creature's stress in the loop)
+    // sees one consistent snapshot. Reading it from the step-boundary larder (the
+    // exact set a save captures) is what keeps it deterministic across save/load:
+    // a loaded world rebuilds the identical field from its restored food, so the
+    // simulation replays bit-for-bit.
+    this.vegetation.rebuild(this.food);
 
     // Grow food over time, scaled by two rhythms: the day-night cycle (fast by
     // day, slow at night) and the slower season × weather climate (rich summers

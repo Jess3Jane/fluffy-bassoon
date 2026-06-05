@@ -302,15 +302,17 @@ export class Creature {
     // wetness burns its base metabolism faster, so the season and weather select
     // on the animals directly — not only through the larder they grow. The
     // climate it is judged against is *local*: the global season/weather level
-    // plus the microclimate's per-region offset at its position, clamped back
-    // onto [0, 1]. So the same instant is warm in one corner of the map and cool
-    // in another, and `warmthPref` / `wetnessPref` partition the population across
-    // space as well as time. Pure in position, sim-time, and the genome (the
-    // microclimate field draws no rng once grown), so it leaves the deterministic
-    // stream untouched and replays bit-identically.
-    const mc = world.microclimate;
-    const warmth = clamp01(climateWarmth(world.time) + mc.warmthOffsetAt(this.x, this.y));
-    const wetness = clamp01(climateWetness(world.time) + mc.wetnessOffsetAt(this.x, this.y));
+    // plus the local spatial offset at its position, clamped back onto [0, 1].
+    // That offset is the static microclimate *plus the living vegetation feedback*
+    // (`world.warmthOffsetAt` / `wetnessOffsetAt`), so a creature standing in a
+    // dense single-kind stand feels that stand's nudge toward its kind's climate —
+    // the larder shaping selection, not just the seed. So the same instant is warm
+    // in one corner of the map and cool in another, and `warmthPref` /
+    // `wetnessPref` partition the population across space as well as time. Pure in
+    // position, sim-time, and the (serialized) larder — no rng — so it leaves the
+    // deterministic stream untouched and replays bit-identically.
+    const warmth = clamp01(climateWarmth(world.time) + world.warmthOffsetAt(this.x, this.y));
+    const wetness = clamp01(climateWetness(world.time) + world.wetnessOffsetAt(this.x, this.y));
     const stress = climateStress(g.warmthPref, g.wetnessPref, warmth, wetness);
     const climateFactor = 1 + c.climateStressCost * stress;
     let cost = c.baseMetabolism * g.metabolismEff * sizeCost * climateFactor;
