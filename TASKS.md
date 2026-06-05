@@ -866,9 +866,62 @@ population dynamics, natural selection, and surprising behaviour.
       and 0.9 in a living world), and the v12 save round-trip (gene preserved,
       bit-identical replay, a pre-v12 save rejected).
 
+- [x] **UI/UX: a creature inspector**, so the rich per-creature genome the world
+      evolves — until now only ever shown as population *averages* in the HUD —
+      becomes tangible on the individual. A third interactive brush, **Inspect**
+      (joining Food / Creature in the existing `Tool` toggle, `src/tools.js`),
+      turns a click into a *pick*: `World.creatureAt(x, y, tolerance)` returns the
+      live creature nearest a world point within its body plus a little slack (the
+      nearest wins when several overlap, dead bodies are skipped, and the lookup
+      wraps across the toroidal edges like every other spatial query). It scans
+      the live list directly rather than the creature grid — a one-off, human-rate
+      click is trivially cheap to scan, and a direct scan always reflects exact
+      current positions (the grid is only rebuilt at the step boundary, so a body
+      that moved mid-step could sit a cell off). A click on empty ground returns
+      null, which the UI reads as "deselect". The selection is held in `main.js`
+      *by creature id*, not by reference, and re-resolved to the live object each
+      frame — so it survives the creature list reordering and naturally clears the
+      instant the creature dies or the world is swapped on reset/load (a vanished
+      id is dropped so it isn't re-scanned). The renderer rings the selected
+      creature and traces its `sense` reach with a dashed circle
+      (`Renderer.drawSelection`), so the inspected individual is easy to follow
+      through the crowd and how far it perceives food/prey reads at a glance. A
+      side panel (top-right, `#inspector`) reads out that one creature's live
+      vitals (trophic role, generation, age, an energy bar coloured red→teal
+      against the species cap, position) and its **full genome**, grouped into
+      Body & senses / Diet & niche / Social sections that mirror how the genome
+      itself is organised, each gene shown with its value *and* an inline meter
+      placing it within its legal `[min, max]` envelope (read straight off `GENES`)
+      — so "high-speed, kin-blind, assortative breeder" reads without memorising
+      every gene's range. A lineage-hue swatch ties the panel back to the
+      on-canvas lineage colouring; the close button and `Esc` both dismiss it, and
+      the canvas cursor switches to a pointer in Inspect mode. Purely a *view* of
+      live state — it draws no rng, adds no serialized state, and touches no
+      simulation logic (no `SAVE_VERSION` bump), so every existing replay/save
+      test passes untouched. Bundled a small UX fix along the way: the left HUD,
+      which had grown to ~35 stat rows plus the charts and controls, could overrun
+      a short viewport and push its own buttons off the bottom (the body clips
+      overflow) — it now caps at the viewport height and scrolls within itself, so
+      the controls stay reachable. `test/inspect.test.mjs` covers the pick
+      (empty-ground null, a dead-centre and body-edge hit, the tolerance ring
+      boundary, nearest-of-overlapping wins, dead bodies excluded, and the
+      toroidal-seam wrap); the DOM panel and pointer wiring need a browser, so —
+      like the renderer and main entry point — they're exercised by hand rather
+      than in the headless suite.
+
 ## Next up
 
-- [ ] UI/UX
+- [ ] **UI/UX, continued.** A first pass landed a *creature inspector* (below);
+      natural follow-ups: (a) a **camera** — pan/zoom the canvas so a large world
+      can be explored up close (the inspector highlight makes following one
+      creature meaningful, but you still can't get near it); (b) **collapsible
+      stat groups** in the left HUD — the ~35 rows are now scrollable but still a
+      flat wall, so fold them into labelled `<details>` sections (Population /
+      Climate / Niche / Social) the way the inspector groups its genome; (c)
+      **click-through inspector links** — jump from a creature to its nearest kin
+      or its current target; (d) a **legend** for the canvas colours/washes
+      (trophic vs. lineage, the amber/blue climate wash, the green/violet plant
+      kinds), which are currently undocumented in-app.
 - [ ] **Make the canopy optimum condition-dependent**, so niche construction
       diverges across the map instead of settling to one global band. Right now the
       facilitation/fecundity balance (and so the evolved `canopyAmp`) is the same

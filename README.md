@@ -243,6 +243,13 @@ Or just use the deployed GitHub Pages site.
   seeds fresh random-genome founders. Drag to lay a continuous trail (food paints
   densely, creatures are spaced out) and reshape the ecosystem by hand — drop a
   feast to trigger a boom, or seed a new founder population to watch it evolve.
+- **Inspect** (the third *Tool*) turns a click into a creature pick: a side panel
+  reads out that one individual's live vitals (trophic role, generation, age, an
+  energy bar, position) and its **full genome**, each gene shown with an inline
+  meter placing it within its legal range — so the rich per-creature genetics the
+  HUD only ever averages become tangible. The picked creature is ringed on the
+  canvas with its sense reach traced, so it's easy to follow through the crowd;
+  the selection clears when it dies, and *Esc* (or the panel's ×) dismisses it.
 - **Pause / Resume**, **Reset**, and a **Speed** slider (1×–8×) in the HUD.
 - **Save / Load** snapshot the world to this browser's localStorage and restore
   it later. Because the random-number generator's state is saved too, a loaded

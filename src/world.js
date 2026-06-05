@@ -418,6 +418,30 @@ export class World {
     return best;
   }
 
+  // Pick the live creature nearest a world point, for the interactive inspector.
+  // A click lands on a creature when it falls within the body plus a small
+  // `tolerance` of slack (so tiny creatures are still easy to hit), and the
+  // nearest qualifying body wins when several overlap. Returns null when the
+  // point is empty — which the inspector reads as "click away to deselect".
+  // A one-off, pointer-driven lookup, so it scans the live list directly rather
+  // than the creature grid: the scan is trivially cheap at a human click rate
+  // and always reflects exact current positions (the grid is only rebuilt at the
+  // step boundary, so a body that moved mid-step could sit a cell off).
+  creatureAt(x, y, tolerance = 0) {
+    let best = null;
+    let bestD2 = Infinity;
+    for (const c of this.creatures) {
+      if (!c.alive) continue;
+      const reach = c.radius + tolerance;
+      const d2 = wrapDistSq(x, y, c.x, c.y, this.width, this.height);
+      if (d2 <= reach * reach && d2 < bestD2) {
+        bestD2 = d2;
+        best = c;
+      }
+    }
+    return best;
+  }
+
   // Record one sexual mating for the reproductive-isolation readout. `cross` is
   // true when the pairing bridged two lineages (the parents sat more than
   // `kinTolerance` apart on the hue wheel), false when it stayed within one.

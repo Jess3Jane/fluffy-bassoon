@@ -36,6 +36,10 @@ export class Renderer {
     // "trophic" colours by diet (green herbivore → red carnivore); "lineage"
     // colours by the heritable lineage marker so clades show as colour bands.
     this.colorMode = "trophic";
+    // The creature the inspector is focused on, or null. Drawn with a highlight
+    // ring and its sense radius so the inspected individual is easy to follow as
+    // it moves; set by `main.js` and cleared when the creature dies.
+    this.selected = null;
     this.resize();
     window.addEventListener("resize", () => this.resize());
   }
@@ -119,6 +123,13 @@ export class Renderer {
     // Creatures.
     for (const c of world.creatures) {
       this.drawCreature(ctx, c);
+    }
+
+    // Inspector highlight: ring the selected creature and trace its sense reach,
+    // so the individual the side panel describes is easy to pick out and follow
+    // through the crowd. Drawn over the bodies but under the weather washes.
+    if (this.selected && this.selected.alive) {
+      this.drawSelection(ctx, this.selected);
     }
 
     // Wind: faint streaks raking across the scene along the prevailing bearing
@@ -252,6 +263,30 @@ export class Renderer {
       ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
       ctx.fill();
     }
+  }
+
+  // Highlight the inspected creature: a bright ring just outside its body and a
+  // faint dashed circle at its `sense` reach, so both the individual and how far
+  // it can perceive food and prey read at a glance. Purely a view of the
+  // selection `main.js` holds — it holds no state of its own.
+  drawSelection(ctx, c) {
+    ctx.save();
+    // Sense reach: a faint dashed circle at the gene's perception radius.
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.22)";
+    ctx.lineWidth = 1 / this.scale;
+    ctx.setLineDash([4 / this.scale, 4 / this.scale]);
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, c.genome.sense, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Selection ring: a bright circle hugging the body.
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+    ctx.lineWidth = 2 / this.scale;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, c.radius + 3 / this.scale + 2, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   drawCreature(ctx, c) {
