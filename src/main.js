@@ -14,6 +14,7 @@ import { saveWorld, loadWorld, hasSavedWorld } from "./persistence.js";
 import { ToolController, TOOLS, TOOL_LABELS } from "./tools.js";
 import { Trail } from "./trail.js";
 import { Minimap } from "./minimap.js";
+import { HEATMAP_MODES, HEATMAP_LABELS } from "./heatmap.js";
 import { renderLegend } from "./legend.js";
 import { phaseLabel } from "./daycycle.js";
 import { kindLabel } from "./plants.js";
@@ -620,6 +621,17 @@ toolBtn.addEventListener("click", () => {
   tools.setTool(TOOLS[(i + 1) % TOOLS.length]);
   toolBtn.textContent = "Tool: " + TOOL_LABELS[tools.tool];
   canvas.style.cursor = tools.tool === "inspect" ? "pointer" : "crosshair";
+});
+
+// Cycle the minimap heatmap overlay (off → population → food → scent), mirroring
+// the colour/tool toggles. It washes a coarse density grid of the chosen quantity
+// onto the overview so off-screen hotspots read at a glance; "off" is the plain
+// dot map.
+const heatBtn = document.getElementById("heat");
+heatBtn.addEventListener("click", () => {
+  const i = HEATMAP_MODES.indexOf(minimap.heatMode);
+  minimap.heatMode = HEATMAP_MODES[(i + 1) % HEATMAP_MODES.length];
+  heatBtn.textContent = "Heat: " + HEATMAP_LABELS[minimap.heatMode];
 });
 
 // --- Camera ---

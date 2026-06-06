@@ -1418,20 +1418,62 @@ population dynamics, natural selection, and surprising behaviour.
       zoom and jumps as you click it, the main view recentres to match, no console
       errors.
 
+- [x] **UI/UX: a minimap heatmap overlay**, so the overview shows *where* things
+      pool across the world, not just a scatter of creature dots. The minimap
+      already plotted every creature as a dot, but a dot scatter reads density
+      poorly at thumbnail scale and showed nothing about the *other* quantities
+      spread across the map — where the larder is thick, where scent is pooling.
+      A HUD **Heat** toggle (mirroring the Colour/Tool toggles) now cycles a wash
+      over the overview through **Off → Population → Food → Scent**: the chosen
+      quantity is binned into a coarse grid over the whole world and painted as a
+      blue→teal→green→yellow→red intensity ramp under the dots/trail/viewport, so an
+      off-screen hotspot (a population cluster, a food-rich corner, a fresh kill's
+      strong danger plume) reads at a glance. All the binning and colour maths are
+      pure functions in a new `src/heatmap.js` so they're unit-testable headlessly:
+      `heatGridSize` derives a grid resolution from the thumbnail size (~7px/cell,
+      always ≥ 1×1), `binPoints` accumulates each item's weight into the cell its
+      toroidal `(x, y)` falls in (a far-edge point clamps into the last cell rather
+      than overflowing; zero/negative/NaN weights are skipped), `gridMax` /
+      `normalize` scale the grid onto `[0, 1]` with a gamma lift (`HEAT_GAMMA` 0.55,
+      < 1, so a faint-but-nonzero cell stays visible rather than being crushed by a
+      single dense outlier), and `sampleRamp` / `heatColor` map a normalised cell to
+      an rgba string whose **alpha climbs from fully transparent at the dim end** so
+      the dots and viewport rectangle drawn on top stay legible. The `Minimap` view
+      just picks the data source per mode (a small `heatSource` switch: creatures /
+      food at weight 1, plumes weighted by their remaining `strength`, so a fresh
+      strong death-marker glows brighter than a faded feeding mark) and paints the
+      cells; "Off" leaves the plain dot overview untouched, and an empty source draws
+      nothing. Purely a *view* feature — no rng, no simulation touch, nothing
+      serialized (no `SAVE_VERSION` bump), so the headless suite stays green.
+      `test/heatmap.test.mjs` covers the mode list / labels, the grid sizing, the
+      binning (cell bucketing, the far-edge clamp with no overflow, weight
+      accumulation, the non-positive-weight and empty/null-list guards), `gridMax`,
+      `normalize` (linear and gamma'd, the ends pinned, the no-divide-by-zero flat
+      grid, the input left unmutated), the ramp (ends pinned, alpha rising from 0 to
+      the cap, rgb in range, the out-of-range clamp), `heatColor` (the transparent
+      zero/negative cell, a well-formed hot rgba), and an end-to-end bin→normalize→
+      colour of a synthetic clump-plus-loner. Verified in the browser across all
+      three modes: Population dots a sparse world's clusters, Food shows a rich
+      green/yellow density gradient over the larder, and Scent reads cool teal with
+      a hot red cell on a fresh blood plume; the toggle cycles back to Off cleanly
+      with no console errors.
+
 ## Next up
 
-- [ ] **UI/UX, continued.** Nine passes have now landed — a *creature inspector*,
+- [ ] **UI/UX, continued.** Ten passes have now landed — a *creature inspector*,
       a *pan/zoom camera*, *collapsible stat groups*, a *follow-selected camera
       mode*, an *in-app legend*, *click-through inspector links*, *smooth zoom
-      easing*, a *creature trail*, and now a *minimap* / world-overview thumbnail
-      (all below). The minimap closes the "zoomed-in view loses the global picture"
-      gap: it shows the whole world with the live viewport rectangle and the
-      selected creature's track, and clicking it jumps the camera anywhere. Open
-      direction for the next UI pass, if picked: a *time-series scrubber* /
-      pause-and-step controls (single-step the fixed timestep to study a moment
-      frame by frame), or a *heatmap overlay* on the minimap (population density /
-      kill sites / scent intensity binned across the world, so off-screen hotspots
-      read at a glance rather than only the dot scatter).
+      easing*, a *creature trail*, a *minimap* / world-overview thumbnail, and now a
+      *minimap heatmap overlay* (all below). The heatmap closes the "the dot scatter
+      shows *who* but not *where it pools*" gap: a HUD **Heat** toggle washes a
+      coarse population / food / scent density grid over the overview so off-screen
+      hotspots read at a glance. Open direction for the next UI pass, if picked: a
+      *time-series scrubber* / pause-and-step controls (single-step the fixed
+      timestep to study a moment frame by frame), a **kill-site** heat layer (a
+      transient, view-only ring of recent kill positions added to the heatmap's
+      cycle, so predation hotspots read alongside population/food/scent — the one
+      heatmap source the live state doesn't already expose), or a *colour key* for
+      the heat ramp in the legend (the wash currently has no documented scale).
 - [ ] **Widen the realised canopy sort further — explicit metapopulation structure.**
       The kin-structured pass below lifted the *mean* realised sort modestly (~+25%)
       and stabilised the world, but per-seed the sort is still swamped by terrain
