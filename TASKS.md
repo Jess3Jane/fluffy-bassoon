@@ -1526,20 +1526,62 @@ population dynamics, natural selection, and surprising behaviour.
       (minimap)** key with the blue→red ramp swatch and the four source labels, no
       console errors.
 
+- [x] World-clock **phase dial** widget, so the three nested rhythms that drive the
+      whole larder — the day-night cycle, the slow season, and the flickering
+      weather — read as a *clock* rather than only as the three HUD text rows
+      (`Daylight` / `Season` / `Weather`). A self-contained view module
+      (`src/phasedial.js`, mirroring the minimap/legend pattern: its own DOM canvas,
+      no simulation state, nothing serialized — purely a view aid reading
+      `world.time`) draws a compact circular dial under the minimap. Layered from the
+      outside in: an **outer season ring** tinted by `seasonLevel` (a cool
+      slate-blue at midwinter warming to a summer gold-green, so the band's hue names
+      the time of year) with a bright tick riding the slow `seasonPhase`; an **inner
+      day-night clock face** — a vertical gradient with a bright day sky up top
+      (where noon sits) fading through a dawn/dusk band to night at the bottom, so the
+      face itself shows which way is day; a **time-of-day hand** sweeping the current
+      `dayPhase` (noon at top, running clockwise like a sun — dusk right, midnight
+      bottom, dawn left) tipped with a **sun by day and a crescent moon by night**,
+      the celestial body switching at the `daylight` ≥ 0.5 line; a **weather-tinted
+      centre cap** (dry ochre in drought through neutral grey to rain blue at the
+      height of a storm — the same dry-warm / wet-cool axis the renderer washes the
+      scene along); and a **wind arrow** through the centre that only appears when a
+      storm actually stirs one up, pointing the `windBearing` it pushes toward and
+      lengthening with `windStrength`. Two terse caption lines under the dial
+      (`phaseLabel · seasonLabel`, then `weatherLabel`) tie the visual read back to
+      the words. The clock convention is the crux that makes it legible: a pure
+      `clockAngle(phase)` maps a `[0,1)` phase to a canvas angle with noon at the top
+      and time running clockwise, and `dialPoint` places every marker on the face off
+      it, so the fast hand, the slow season tick, and the day/night gradient all
+      share one orientation. Everything geometric and the two colour ramps
+      (`seasonColor`, `weatherColor`, built on a clamping `lerpRgb`) are pure
+      functions, unit-tested headlessly in `test/phasedial.test.mjs` (the angle
+      mapping at the four cardinal phases, `dialPoint` landing on the circle's
+      cardinal points and always on the given radius, `lerpRgb` endpoints/midpoint/
+      clamping, `seasonColor` cool-winter→warm-summer monotonicity, and
+      `weatherColor`'s drought-ochre / fair-grey / storm-blue half-ramps meeting at
+      the fair seam); the canvas draw itself needs a browser and is verified there.
+      Purely presentational — no rng, no serialized state, no simulation touch (no
+      `SAVE_VERSION` bump) — so the headless suite stays green. Verified in the
+      browser at several times of day: the gold summer ring, the day-night gradient
+      face, the hand carrying a sun at noon and a moon at dusk/night, and the
+      captions all render cleanly below the minimap with no console errors.
+
 ## Next up
 
-- [ ] **UI/UX, continued.** Thirteen passes have now landed — a *creature inspector*,
+- [ ] **UI/UX, continued.** Fourteen passes have now landed — a *creature inspector*,
       a *pan/zoom camera*, *collapsible stat groups*, a *follow-selected camera
       mode*, an *in-app legend*, *click-through inspector links*, *smooth zoom
       easing*, a *creature trail*, a *minimap* / world-overview thumbnail, a *minimap
-      heatmap overlay*, a *kill-site heat layer*, and now a *heatmap colour key in the
-      legend* (all below). The heatmap washes a coarse density grid over the overview
-      so off-screen hotspots read at a glance, and the legend now documents its
-      blue→red scale and its five sources. Open direction for the next UI pass, if
-      picked: a *time-series scrubber* / pause-and-step controls (single-step the
-      fixed timestep to study a moment frame by frame), or surface the *day-night /
-      season / weather phase* as a small clock/dial widget rather than only as HUD
-      text.
+      heatmap overlay*, a *kill-site heat layer*, a *heatmap colour key in the
+      legend*, and now a *world-clock phase dial* (all below). The phase dial surfaces
+      the day-night / season / weather state as a small clock — a time-of-day hand
+      with a sun/moon tip, a season-tinted outer ring, a weather-tinted hub, and a
+      storm wind arrow — so the three nested rhythms read at a glance rather than only
+      as HUD text. Open direction for the next UI pass, if picked: a *time-series
+      scrubber* / pause-and-step controls (single-step the fixed timestep to study a
+      moment frame by frame, the one remaining item from this pass's original two
+      options), or a *legend/tooltip pass* on the new phase dial so its rings and
+      glyphs are documented the way the heatmap ramp now is.
 - [ ] **Widen the realised canopy sort further — explicit metapopulation structure.**
       The kin-structured pass below lifted the *mean* realised sort modestly (~+25%)
       and stabilised the world, but per-seed the sort is still swamped by terrain

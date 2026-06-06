@@ -265,6 +265,18 @@ button:disabled:hover { background: rgba(111, 211, 199, 0.12); }
   touch-action: none; /* let the drag-to-navigate own the gesture on touch */
 }
 
+#phasedial {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+}
+
+#phasedial-canvas {
+  display: block;
+  border-radius: 6px;
+  background: rgba(8, 12, 19, 0.5);
+}
+
 /* --- Camera controls (bottom-right): zoom in / out / reset view --- */
 
 #camera-controls {
