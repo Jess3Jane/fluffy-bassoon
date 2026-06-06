@@ -16,7 +16,7 @@ import { clamp01 } from "./math.js";
 
 // The selectable overlay layers, in toggle-cycle order. "off" draws nothing (the
 // plain dot overview); the rest each bin a different live quantity.
-export const HEATMAP_MODES = ["off", "population", "food", "scent"];
+export const HEATMAP_MODES = ["off", "population", "food", "scent", "kills"];
 
 // Short labels for the HUD toggle button.
 export const HEATMAP_LABELS = {
@@ -24,6 +24,7 @@ export const HEATMAP_LABELS = {
   population: "Population",
   food: "Food",
   scent: "Scent",
+  kills: "Kills",
 };
 
 // Target on-screen size (CSS px) of one heat cell. The grid resolution is derived

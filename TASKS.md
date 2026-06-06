@@ -1458,22 +1458,60 @@ population dynamics, natural selection, and surprising behaviour.
       a hot red cell on a fresh blood plume; the toggle cycles back to Off cleanly
       with no console errors.
 
+- [x] **UI/UX: a kill-site heat layer**, so predation hotspots read on the minimap
+      overview alongside the population / food / scent washes. Those three each bin a
+      quantity the live world *standing*-exposes (bodies, pellets, plumes); a kill, by
+      contrast, is an **event** — it spills a danger plume on the scent field, but the
+      kill *position itself* isn't carried anywhere the heatmap could read, so it was
+      "the one heatmap source the live state doesn't already expose" the prior seed
+      named. A small view-only module (`src/killfeed.js`, `KillFeed`) closes that gap:
+      a bounded ring of recent kill positions, each stamped with the sim-time it
+      happened so a pure `killWeight(site, now, maxAge)` fades it linearly from 1 at
+      the instant of the kill to 0 at `CONFIG.killFeed.maxAge` (12s) — so a fresh kill
+      glows and an old one dims, the wash reading as "where predation is happening
+      *now*" rather than an all-time tally. The ring is capped at `maxSites` (400,
+      evicting oldest-first) so a predation burst stays bounded, and `prune` trims the
+      faded leading run as the feed is read. `Creature.update` records the victim's
+      position (`world.recordKill`) right where it already bumps `world.kills` and
+      spills the blood plume; the world holds the feed as a transient field
+      (constructed empty in every world, so a reset/load starts blank and refills as
+      predation resumes). Crucially it is **purely a view aid**, on the same contract
+      as the inspector trail and the heatmap itself: recording draws **no rng** (the
+      test asserts the rng state is untouched across a `recordKill`) and the feed is
+      **never serialized** (the snapshot carries no kill sites; a restored world's feed
+      is empty), so the deterministic stream is byte-identical and every replay/save
+      test passes untouched (no `SAVE_VERSION` bump). The heatmap gains a fifth mode —
+      the cycle is now Off → Population → Food → Scent → **Kills** (`HEATMAP_MODES` /
+      `HEATMAP_LABELS` in `src/heatmap.js`) — and `minimap.js`'s `heatSource` maps it
+      to the feed's sites with the recency `killWeight` as the per-cell weight (pruning
+      faded sites before binning), so a fresh strong cluster of kills glows hot-red and
+      fades through the existing blue→teal→green→yellow→red ramp as predation moves on.
+      `test/killfeed.test.mjs` covers `killWeight` (1 fresh, the linear fade, 0 at/past
+      `maxAge`, the future-site guard, monotonicity), the ring (record stamping &
+      newest-last order, the `maxSites` cap evicting oldest, `prune` dropping only the
+      faded leading run and its idempotence, `clear`), and the world wiring (`recordKill`
+      stamps the live sim-time and draws no rng, the snapshot omits the feed, and a
+      round-trip restores an empty feed); `test/heatmap.test.mjs`'s mode-list assertion
+      grew to include `kills`. Verified in the browser at 8× speed: after ~140 kills the
+      **Heat: Kills** overlay washed the overview with recency-coloured cells (fresh
+      red-orange fading to teal/blue) over the creature dots and under the viewport
+      rectangle, and the toggle cycled cleanly back to Off with no console errors.
+
 ## Next up
 
-- [ ] **UI/UX, continued.** Ten passes have now landed — a *creature inspector*,
+- [ ] **UI/UX, continued.** Twelve passes have now landed — a *creature inspector*,
       a *pan/zoom camera*, *collapsible stat groups*, a *follow-selected camera
       mode*, an *in-app legend*, *click-through inspector links*, *smooth zoom
-      easing*, a *creature trail*, a *minimap* / world-overview thumbnail, and now a
-      *minimap heatmap overlay* (all below). The heatmap closes the "the dot scatter
-      shows *who* but not *where it pools*" gap: a HUD **Heat** toggle washes a
-      coarse population / food / scent density grid over the overview so off-screen
-      hotspots read at a glance. Open direction for the next UI pass, if picked: a
-      *time-series scrubber* / pause-and-step controls (single-step the fixed
-      timestep to study a moment frame by frame), a **kill-site** heat layer (a
-      transient, view-only ring of recent kill positions added to the heatmap's
-      cycle, so predation hotspots read alongside population/food/scent — the one
-      heatmap source the live state doesn't already expose), or a *colour key* for
-      the heat ramp in the legend (the wash currently has no documented scale).
+      easing*, a *creature trail*, a *minimap* / world-overview thumbnail, a *minimap
+      heatmap overlay*, and now a *kill-site heat layer* (all below). The heatmap
+      washes a coarse density grid over the overview so off-screen hotspots read at a
+      glance, and its newest mode adds the one source the live state didn't expose —
+      recent **kill** positions, fading by recency, so predation hotspots read
+      alongside population / food / scent. Open direction for the next UI pass, if
+      picked: a *time-series scrubber* / pause-and-step controls (single-step the
+      fixed timestep to study a moment frame by frame), or a *colour key* for the heat
+      ramp in the legend (the wash now spans five sources but still has no documented
+      scale — the legend never picked up the heatmap at all).
 - [ ] **Widen the realised canopy sort further — explicit metapopulation structure.**
       The kin-structured pass below lifted the *mean* realised sort modestly (~+25%)
       and stabilised the world, but per-seed the sort is still swamped by terrain

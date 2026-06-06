@@ -265,6 +265,10 @@ export class Creature {
         } else {
           victim.alive = false;
           world.kills++;
+          // Record where the prey fell for the view-only kill-site heat layer (a
+          // pure observation — no rng, never serialized, so the deterministic
+          // stream is untouched).
+          world.recordKill(victim.x, victim.y);
           // Meat yield scales not just with how carnivorous we are, but with how
           // well our `hunt` specialism matches the victim's body size: a predator
           // tuned to this prey's size gets full value, one reaching to the edge of

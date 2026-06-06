@@ -549,6 +549,16 @@ export const CONFIG = {
     minDist: 4,
   },
 
+  // Kill-site feed: a bounded, view-only ring of recent kill positions, washed
+  // over the minimap as a predation heat layer. Purely a view aid — no
+  // simulation state, never serialized. A site fades out linearly over `maxAge`
+  // sim-seconds, and the ring holds at most `maxSites` so a predation burst
+  // stays bounded; older entries drop first.
+  killFeed: {
+    maxAge: 12,
+    maxSites: 400,
+  },
+
   // Mutation applied to each genome gene at birth.
   mutation: {
     rate: 0.9, // probability a child mutates at all

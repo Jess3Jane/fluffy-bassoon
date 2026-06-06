@@ -32,6 +32,7 @@ import {
   inheritCanopy,
 } from "./vegetation.js";
 import { ScentField } from "./scent.js";
+import { KillFeed } from "./killfeed.js";
 import {
   plantKindAt,
   kindYieldFactor,
@@ -137,6 +138,13 @@ export class World {
     // and die, smelled by others. Starts empty in every world (it's grown by
     // play, not seeded), and is restored from a save on load.
     this.scent = new ScentField(this.width, this.height);
+
+    // The kill-site feed: a transient, view-only ring of recent kill positions
+    // for the minimap's predation heat layer. It holds no serialized state and
+    // draws no rng — a kill records its position here (`recordKill`) as a pure
+    // observation — so it never perturbs the deterministic stream; a loaded or
+    // reset world starts with an empty feed and refills as predation resumes.
+    this.killFeed = new KillFeed(CONFIG.killFeed.maxAge, CONFIG.killFeed.maxSites);
 
     // A rolling record of the last `matingWindow` sexual matings, one bit each:
     // 1 if the pairing crossed a lineage (parents more than `kinTolerance` apart
@@ -576,6 +584,15 @@ export class World {
     if (this.matingRing.length > CONFIG.speciation.matingWindow) {
       this.matingRing.shift();
     }
+  }
+
+  // Note a kill at a world point for the view-only kill-site feed (the minimap's
+  // predation heat layer). Stamped with the current sim-time so its heat fades
+  // with age. Pure observation: it draws no rng and feeds nothing back into the
+  // dynamics, so it never perturbs the deterministic stream (the feed is also
+  // never serialized — a loaded world just refills it as predation resumes).
+  recordKill(x, y) {
+    this.killFeed.record(x, y, this.time);
   }
 
   // Forage the plants within `radius` of a point for a creature with this

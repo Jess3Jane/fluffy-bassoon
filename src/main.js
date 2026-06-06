@@ -623,10 +623,10 @@ toolBtn.addEventListener("click", () => {
   canvas.style.cursor = tools.tool === "inspect" ? "pointer" : "crosshair";
 });
 
-// Cycle the minimap heatmap overlay (off → population → food → scent), mirroring
-// the colour/tool toggles. It washes a coarse density grid of the chosen quantity
-// onto the overview so off-screen hotspots read at a glance; "off" is the plain
-// dot map.
+// Cycle the minimap heatmap overlay (off → population → food → scent → kills),
+// mirroring the colour/tool toggles. It washes a coarse density grid of the chosen
+// quantity onto the overview so off-screen hotspots read at a glance; "off" is the
+// plain dot map.
 const heatBtn = document.getElementById("heat");
 heatBtn.addEventListener("click", () => {
   const i = HEATMAP_MODES.indexOf(minimap.heatMode);

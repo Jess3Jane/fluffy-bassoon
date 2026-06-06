@@ -14,6 +14,7 @@
 
 import { trailSegments } from "./trail.js";
 import { binPoints, normalize, heatColor, heatGridSize } from "./heatmap.js";
+import { killWeight } from "./killfeed.js";
 
 export const MINIMAP = {
   // The thumbnail fits within this pixel box, preserving the world's aspect
@@ -229,6 +230,10 @@ export class Minimap {
 //   * food       — every plant pellet, weight 1: the standing larder's thickness.
 //   * scent      — every plume, weighted by its remaining strength, so a fresh
 //     strong death-marker glows brighter than a faded feeding mark.
+//   * kills      — recent kill sites from the view-only kill feed, weighted by
+//     recency (fresh kills glow, old ones fade), so predation hotspots read at a
+//     glance. Unlike the other three this isn't standing live state — a kill is
+//     an event — so the world accumulates the positions transiently for the view.
 function heatSource(world, mode) {
   switch (mode) {
     case "population":
@@ -242,6 +247,17 @@ function heatSource(world, mode) {
         getY: (p) => p.y,
         getWeight: (p) => p.strength,
       };
+    case "kills": {
+      const feed = world.killFeed;
+      if (!feed) return null;
+      feed.prune(world.time); // tidy fully-faded sites before reading
+      return {
+        items: feed.sites,
+        getX: (s) => s.x,
+        getY: (s) => s.y,
+        getWeight: (s) => killWeight(s, world.time, feed.maxAge),
+      };
+    }
     default:
       return null;
   }
