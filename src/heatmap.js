@@ -133,6 +133,15 @@ export function sampleRamp(t) {
   return [r, g, b, a];
 }
 
+// The ramp as positioned CSS colour stops, for the legend's heat-scale swatch.
+// Sourced from the same `RAMP` the wash samples — so the documented key can never
+// drift from what the minimap actually paints. Opaque `rgb(...)` (the legend
+// shows the colour→intensity mapping at full strength; the on-map alpha fade is a
+// rendering detail of laying it over the dots, not part of the scale).
+export function rampStops() {
+  return RAMP.map(([pos, r, g, b]) => ({ pos, color: `rgb(${r}, ${g}, ${b})` }));
+}
+
 // Convenience: the ramp as a CSS `rgba(...)` string for a normalised cell value.
 // A value at or below 0 returns fully transparent so a zero cell paints nothing.
 export function heatColor(t) {

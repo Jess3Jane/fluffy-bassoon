@@ -1497,21 +1497,49 @@ population dynamics, natural selection, and surprising behaviour.
       red-orange fading to teal/blue) over the creature dots and under the viewport
       rectangle, and the toggle cycled cleanly back to Off with no console errors.
 
+- [x] **UI/UX: a heatmap colour key in the legend.** The minimap heat wash had
+      grown to span five sources (off / population / food / scent / kills), each
+      painting the same blue→teal→green→yellow→red intensity ramp — but the in-app
+      legend, which documents every *other* canvas colour and wash, never picked up
+      the heatmap at all, so the ramp's scale and *what* it can show were undocumented
+      on screen. The legend (`src/legend.js`) gains a **Heatmap (minimap)** section: a
+      single gradient swatch labelled **Low → High** whose note names the live sources
+      (**Population · Food · Scent · Kills** — every `HEATMAP_MODES` entry but `off`,
+      read off `HEATMAP_LABELS` so the key tracks the toggle rather than re-typing the
+      list). The crux is that the swatch is *not* a hand-copied gradient: a new
+      `rampStops()` (`src/heatmap.js`) exposes the same `RAMP` the overlay samples as
+      positioned CSS colour stops, and the legend builds its swatch from them
+      (`color pos%` per stop) — so, exactly like the palette-sourced terrain/plant/
+      scent swatches, a hue or spacing change to the ramp updates the painted wash and
+      the documented key together and they can never drift. It reuses the existing
+      `gradient` swatch kind (positioned multi-stop stops are valid CSS and render
+      through the same `swatchBackground`), so no renderer change was needed; the
+      swatch shows the ramp at full opacity (the on-map alpha fade is a compositing
+      detail of laying it over the dots, not part of the colour→intensity scale the
+      key documents). Purely presentational — no rng, no serialized state, no
+      simulation touch (no `SAVE_VERSION` bump) — so the headless suite stays green.
+      `test/legend.test.mjs` gains coverage of the new section (the gradient swatch
+      built from `rampStops` with a stop per ramp colour, the floor pinned at 0% and
+      the peak at 100%, and the note naming every source mode but `off`); the existing
+      `legendModel` structure / mode-parity assertions and `heatmap.test.mjs` all
+      still hold. Verified in the browser: opening the legend shows the new **Heatmap
+      (minimap)** key with the blue→red ramp swatch and the four source labels, no
+      console errors.
+
 ## Next up
 
-- [ ] **UI/UX, continued.** Twelve passes have now landed — a *creature inspector*,
+- [ ] **UI/UX, continued.** Thirteen passes have now landed — a *creature inspector*,
       a *pan/zoom camera*, *collapsible stat groups*, a *follow-selected camera
       mode*, an *in-app legend*, *click-through inspector links*, *smooth zoom
       easing*, a *creature trail*, a *minimap* / world-overview thumbnail, a *minimap
-      heatmap overlay*, and now a *kill-site heat layer* (all below). The heatmap
-      washes a coarse density grid over the overview so off-screen hotspots read at a
-      glance, and its newest mode adds the one source the live state didn't expose —
-      recent **kill** positions, fading by recency, so predation hotspots read
-      alongside population / food / scent. Open direction for the next UI pass, if
+      heatmap overlay*, a *kill-site heat layer*, and now a *heatmap colour key in the
+      legend* (all below). The heatmap washes a coarse density grid over the overview
+      so off-screen hotspots read at a glance, and the legend now documents its
+      blue→red scale and its five sources. Open direction for the next UI pass, if
       picked: a *time-series scrubber* / pause-and-step controls (single-step the
-      fixed timestep to study a moment frame by frame), or a *colour key* for the heat
-      ramp in the legend (the wash now spans five sources but still has no documented
-      scale — the legend never picked up the heatmap at all).
+      fixed timestep to study a moment frame by frame), or surface the *day-night /
+      season / weather phase* as a small clock/dial widget rather than only as HUD
+      text.
 - [ ] **Widen the realised canopy sort further — explicit metapopulation structure.**
       The kin-structured pass below lifted the *mean* realised sort modestly (~+25%)
       and stabilised the world, but per-seed the sort is still swamped by terrain
