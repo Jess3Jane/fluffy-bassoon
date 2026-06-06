@@ -26,7 +26,7 @@ const ONE = () => 1;
 
 // --- The mode list and labels stay in sync. ---
 {
-  assert.deepStrictEqual(HEATMAP_MODES, ["off", "population", "food", "scent"]);
+  assert.deepStrictEqual(HEATMAP_MODES, ["off", "population", "food", "scent", "kills"]);
   for (const m of HEATMAP_MODES) {
     assert.ok(typeof HEATMAP_LABELS[m] === "string" && HEATMAP_LABELS[m].length > 0, `label for ${m}`);
   }
