@@ -20,6 +20,7 @@ import {
   TILE,
 } from "./palette.js";
 import { kindLabel } from "./plants.js";
+import { rampStops, HEATMAP_LABELS, HEATMAP_MODES } from "./heatmap.js";
 
 // A swatch descriptor names how the colour reads on the canvas:
 //   solid    — a flat fill (plants, terrain tiles)
@@ -30,6 +31,21 @@ const solid = (color) => ({ kind: "solid", colors: [color] });
 const gradient = (...colors) => ({ kind: "gradient", colors });
 const hue = () => ({ kind: "hue", colors: [] });
 const wash = (color) => ({ kind: "wash", colors: [color] });
+// The minimap heat ramp as a positioned multi-stop gradient. Built from the
+// heatmap's own `rampStops` so the documented scale tracks the painted one; each
+// stop carries its position so the swatch reproduces the ramp's spacing (the dim
+// blue floor through teal/green/yellow to the hot red peak), not an even spread.
+const ramp = () => ({
+  kind: "gradient",
+  colors: rampStops().map(({ pos, color }) => `${color} ${Math.round(pos * 100)}%`),
+});
+
+// The heat overlay's selectable sources (every mode but "off"), as a human list
+// for the scale's note — so the key names *what* the wash can show, not just the
+// blue→red intensity it shows it in.
+const heatSources = HEATMAP_MODES.filter((m) => m !== "off")
+  .map((m) => HEATMAP_LABELS[m])
+  .join(" · ");
 
 // The legend content as plain data, so it can be unit-tested without a DOM and
 // rendered by `renderLegend` below. The creatures section depends on the active
@@ -91,6 +107,12 @@ export function legendModel(colorMode) {
         { swatch: wash(NIGHT_VEIL), label: "Night", note: "the day-night veil" },
         { swatch: wash(WEATHER_RAIN), label: "Rain", note: "a cool, wet spell" },
         { swatch: wash(WEATHER_DROUGHT), label: "Drought", note: "a dry warm haze" },
+      ],
+    },
+    {
+      title: "Heatmap (minimap)",
+      items: [
+        { swatch: ramp(), label: "Low → High", note: heatSources },
       ],
     },
   ];

@@ -11,6 +11,7 @@ import {
   TROPHIC_CARNIVORE,
   TILE,
 } from "../src/palette.js";
+import { rampStops, HEATMAP_LABELS } from "../src/heatmap.js";
 
 // Every section has a title and at least one item; every item carries a swatch
 // with a known kind and a label.
@@ -59,5 +60,34 @@ assert.strictEqual(plants.items[1].swatch.colors[0], FOOD_COLORS[1], "moonleaf s
 const ground = legendModel("trophic").find((s) => s.title === "Ground");
 const water = ground.items.find((i) => i.label === "Water");
 assert.strictEqual(water.swatch.colors[0], TILE_COLORS[TILE.WATER], "water swatch uses the tile palette");
+
+// The heatmap scale documents the minimap wash: a single gradient swatch built
+// from the same `rampStops` the overlay paints (so the key can't drift), with a
+// stop per ramp colour positioned at its intensity. Its note names the sources.
+const heat = legendModel("trophic").find((s) => s.title === "Heatmap (minimap)");
+assert.ok(heat, "legend has a heatmap section");
+const heatSwatch = heat.items[0].swatch;
+assert.strictEqual(heatSwatch.kind, "gradient", "heat swatch is a gradient");
+const stops = rampStops();
+assert.strictEqual(
+  heatSwatch.colors.length,
+  stops.length,
+  "heat swatch has one stop per ramp colour",
+);
+assert.strictEqual(
+  heatSwatch.colors[0],
+  `${stops[0].color} 0%`,
+  "first heat stop is the ramp floor at 0%",
+);
+assert.strictEqual(
+  heatSwatch.colors[stops.length - 1],
+  `${stops[stops.length - 1].color} 100%`,
+  "last heat stop is the ramp peak at 100%",
+);
+// The note names the wash's live sources (every heatmap mode but "off").
+for (const label of [HEATMAP_LABELS.population, HEATMAP_LABELS.food, HEATMAP_LABELS.scent, HEATMAP_LABELS.kills]) {
+  assert.ok(heat.items[0].note.includes(label), `heat note names the ${label} source`);
+}
+assert.ok(!heat.items[0].note.includes(HEATMAP_LABELS.off), "heat note omits the off mode");
 
 console.log("LEGEND TEST PASSED");
