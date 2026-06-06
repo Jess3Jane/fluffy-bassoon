@@ -13,6 +13,7 @@
 // and adds nothing to the save — purely a view aid.
 
 import { trailSegments } from "./trail.js";
+import { binPoints, normalize, heatColor, heatGridSize } from "./heatmap.js";
 
 export const MINIMAP = {
   // The thumbnail fits within this pixel box, preserving the world's aspect
@@ -76,6 +77,9 @@ export class Minimap {
     // Current thumbnail size in CSS pixels; resized lazily to the world's aspect.
     this.w = 0;
     this.h = 0;
+    // Active heatmap overlay layer ("off" / "population" / "food" / "scent"),
+    // cycled by the HUD toggle. "off" leaves the plain dot overview untouched.
+    this.heatMode = "off";
   }
 
   // Size the backing canvas to the world's aspect ratio (only when it changes,
@@ -110,6 +114,10 @@ export class Minimap {
     // Backdrop: a touch lighter than the page so the thumbnail reads as a map.
     ctx.fillStyle = "rgba(8, 12, 19, 0.92)";
     ctx.fillRect(0, 0, mmW, mmH);
+
+    // Heatmap wash (under everything else, so the dots/trail/viewport stay on
+    // top): a coarse grid of the selected quantity binned across the whole world.
+    this.drawHeat(world, mmW, mmH);
 
     // Creatures as 1px dots, coloured by the renderer's active mode (diet hue in
     // trophic, clade hue in lineage) so the overview matches the main canvas.
@@ -165,6 +173,40 @@ export class Minimap {
     ctx.strokeRect(tl.x + 0.5, tl.y + 0.5, Math.max(1, wpx - 1), Math.max(1, hpx - 1));
   }
 
+  // Bin the active heat quantity across the world and wash it onto the thumbnail
+  // as a coloured grid. A no-op when the overlay is off or the source is empty.
+  // Pure binning/colour maths live in `heatmap.js`; this just picks the data
+  // source per mode and paints the cells.
+  drawHeat(world, mmW, mmH) {
+    const src = heatSource(world, this.heatMode);
+    if (!src) return;
+    const { cols, rows } = heatGridSize(mmW, mmH);
+    const grid = binPoints(
+      src.items,
+      cols,
+      rows,
+      world.width,
+      world.height,
+      src.getX,
+      src.getY,
+      src.getWeight
+    );
+    const norm = normalize(grid);
+    const ctx = this.ctx;
+    const cw = mmW / cols;
+    const ch = mmH / rows;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const t = norm[r * cols + c];
+        if (t <= 0) continue;
+        ctx.fillStyle = heatColor(t);
+        // Overlap each cell by ~0.5px so the grid reads as a continuous wash
+        // rather than a tile fence at thumbnail scale.
+        ctx.fillRect(c * cw - 0.5, r * ch - 0.5, cw + 1, ch + 1);
+      }
+    }
+  }
+
   // Convert a client (screen) pixel to the world point under it, via the
   // thumbnail's on-screen rectangle. Returns null if the thumbnail isn't sized
   // yet. Used by the click-to-navigate handler in `main.js`.
@@ -174,5 +216,33 @@ export class Minimap {
     const mx = clamp(clientX - rect.left, 0, this.w);
     const my = clamp(clientY - rect.top, 0, this.h);
     return minimapToWorld(mx, my, this.w, this.h, worldW, worldH);
+  }
+}
+
+// Resolve a heat mode to its live data source: the items to bin, how to read each
+// one's position, and its weight. Returns null for "off" (or an unknown mode), so
+// the overlay simply draws nothing. Kept as a plain function (not a method) so the
+// mode→source mapping is in one readable place and easy to extend.
+//
+//   * population — every live creature, weight 1, so the grid is a body-count
+//     density (where the crowd is, beyond what the dot scatter shows).
+//   * food       — every plant pellet, weight 1: the standing larder's thickness.
+//   * scent      — every plume, weighted by its remaining strength, so a fresh
+//     strong death-marker glows brighter than a faded feeding mark.
+function heatSource(world, mode) {
+  switch (mode) {
+    case "population":
+      return { items: world.creatures, getX: (c) => c.x, getY: (c) => c.y, getWeight: () => 1 };
+    case "food":
+      return { items: world.food, getX: (f) => f.x, getY: (f) => f.y, getWeight: () => 1 };
+    case "scent":
+      return {
+        items: world.scent ? world.scent.plumes : null,
+        getX: (p) => p.x,
+        getY: (p) => p.y,
+        getWeight: (p) => p.strength,
+      };
+    default:
+      return null;
   }
 }
