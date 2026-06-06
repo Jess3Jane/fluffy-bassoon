@@ -14,6 +14,7 @@ import { saveWorld, loadWorld, hasSavedWorld } from "./persistence.js";
 import { ToolController, TOOLS, TOOL_LABELS } from "./tools.js";
 import { Trail } from "./trail.js";
 import { Minimap } from "./minimap.js";
+import { PhaseDial } from "./phasedial.js";
 import { HEATMAP_MODES, HEATMAP_LABELS } from "./heatmap.js";
 import { renderLegend } from "./legend.js";
 import { phaseLabel } from "./daycycle.js";
@@ -28,6 +29,7 @@ const camera = new Camera();
 const renderer = new Renderer(canvas, camera);
 const charts = new Charts(document.getElementById("charts"));
 const minimap = new Minimap(document.getElementById("minimap-canvas"), camera, renderer);
+const phaseDial = new PhaseDial(document.getElementById("phasedial-canvas"));
 
 let world;
 let history;
@@ -127,6 +129,7 @@ function loop(now) {
   // The minimap reads the renderer's just-resolved transform for its viewport
   // rectangle, so draw it after the main view each frame.
   minimap.draw(world, selected, trail);
+  phaseDial.draw(world);
   updateHud();
   updateInspector(selected);
   drawCharts();
